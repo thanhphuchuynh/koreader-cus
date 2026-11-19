@@ -1,0 +1,9 @@
+{
+  "official_build": "v2026.07.2-280-g400ba0e_2026-10-24",
+  "architecture": "arm64",
+  "release_archive_sha256": "5a246e7000a4b258d2320e54e3eee18d857bd054d194fa50547395d2dfd7aa1e",
+  "fork_overlay_commit": "44da9a6",
+  "overlay_sha256": "67a050c146173ce9a69e558ec4c6a7f6bc6faed0f90868a3e5375e96abbaf39c",
+  "mode": "official native nightly with isolated fork-method user patch, not full fork build",
+  "data_directory": "/Users/tphuc/coding/kindle/runtime/macos/test-data"
+}

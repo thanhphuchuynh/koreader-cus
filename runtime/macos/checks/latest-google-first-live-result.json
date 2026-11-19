@@ -1,0 +1,10 @@
+{
+  "google_network_real": true,
+  "ui_and_worker_simulated": true,
+  "seconds": 0.52,
+  "provider": "Google Translate · English → Vietnamese",
+  "translation": "Cô quyết định hoãn cuộc họp đến thứ Hai.",
+  "title": "Translation",
+  "ai_calls": 0,
+  "success": true
+}

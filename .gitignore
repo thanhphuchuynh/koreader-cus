@@ -1,0 +1,41 @@
+.DS_Store
+__pycache__/
+*.log
+
+# Secrets: AI API keys never leave the machine.
+*.key
+*.key.new
+runtime/macos/test-data/settings/english-ai.key*
+
+# Downloaded third-party code, release archives and builds (re-fetch / rebuild).
+build/
+research/sources/
+research/artifacts/
+runtime/macos/KOReader.app/
+runtime/kindle/staging/
+
+# Personal Kindle data: backups, crash dumps, device file listings.
+runtime/kindle/backups/
+runtime/kindle/device-audit/*.log
+
+# Mac preview profile state; only plugins and patches are source.
+runtime/macos/test-data/*
+!runtime/macos/test-data/plugins/
+!runtime/macos/test-data/patches/
+runtime/macos/performance/current/
+runtime/macos/performance/simpleui/
+runtime/macos/performance/books/
+runtime/macos/performance/*.json
+
+# Generated / third-party binaries inside the plugin:
+# voca binary + model (github.com/sultson/voca release), idiom index (runtime/build-phrases.py).
+runtime/macos/test-data/plugins/englishpreview.koplugin/voca/voca
+runtime/macos/test-data/plugins/englishpreview.koplugin/voca/data/
+runtime/macos/test-data/plugins/englishpreview.koplugin/english_phrases.tsv
+
+# Copyrighted books and reading state.
+demo/co-chan-nhan_bilingual.epub
+*.sdr/
+
+# Mac preview settings backups (contain a device id).
+runtime/macos/backups/

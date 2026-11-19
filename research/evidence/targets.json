@@ -1,0 +1,77 @@
+{
+  "scope": "Read-only static product investigation; no Kindle connection or profiling",
+  "source_checkouts": {
+    "koreader": {
+      "commit": "28099b3915c5de300d6215cc06e5dcf94883953f",
+      "path": "/Users/tphuc/coding/kindle/research/sources/koreader",
+      "base_commit": "33b43b5b21a2f2aa7a8b5ad53b6d83d3954f51c0"
+    },
+    "calibre": {
+      "commit": "e596764888de1040f498f94bcf4c04cba33cf5a1",
+      "path": "/Users/tphuc/coding/kindle/research/sources/calibre"
+    }
+  },
+  "koreader_release": {
+    "path": "/Users/tphuc/coding/kindle/research/artifacts/koreader-kindlehf-v2026.07.1.zip",
+    "sha256": "3343a916d12f36c01b59df1f65bd83ff5616e6c2a4dfbe919e7fa1400b8b1bbb",
+    "selected_files": [
+      {
+        "path": "koreader/git-rev",
+        "bytes": 11,
+        "sha256": "90438744279e39ea48f811e9c25ff4dd35a2760b8b16b3013440e74aca9a3582"
+      },
+      {
+        "path": "koreader/koreader.sh",
+        "bytes": 19220,
+        "sha256": "99135d6711d96ac6c0c13aabb9c80b59292bd370ff527a9920de9aa37770bb51"
+      },
+      {
+        "path": "koreader/frontend/device/kindle/device.lua",
+        "bytes": 86526,
+        "sha256": "eb814f0e4d6f7f73ded728379ecf3677bce9e5c10b0fc3512f8c7c4cd176d0d6"
+      },
+      {
+        "path": "koreader/frontend/document/credocument.lua",
+        "bytes": 86072,
+        "sha256": "b3f7c7510dc8f36fb50141e498a5f67dd890a35c2ec4fcd7b3ff462fc618ce69"
+      },
+      {
+        "path": "koreader/frontend/document/pdfdocument.lua",
+        "bytes": 15644,
+        "sha256": "963cbae1a42e5cb163361e89585a47ca2994477cac5741da743d314fa2b5fe60"
+      },
+      {
+        "path": "koreader/frontend/apps/reader/modules/readerrolling.lua",
+        "bytes": 92745,
+        "sha256": "4af978e7d81fa91d8f3a93096b9c656edf0a7c47078a305ea35ac87d9d72d68c"
+      },
+      {
+        "path": "koreader/ffi/framebuffer_mxcfb.lua",
+        "bytes": 61977,
+        "sha256": "41fb642f79a50f3d7b5c5884323fc5e4b893bf5bcf5b537fde173506d3fe1525"
+      },
+      {
+        "path": "koreader/frontend/ui/uimanager.lua",
+        "bytes": 72990,
+        "sha256": "acf8d2e18dad832e17c6f5f677b2a89b3215b11150a79d8f86741f589855c286"
+      }
+    ],
+    "native_members": [
+      "koreader/libs/libkoreader-cre.so",
+      "koreader/libs/libwrap-mupdf.so"
+    ]
+  },
+  "calibre_installed": {
+    "version": "9.6.0",
+    "binaries": [
+      {
+        "path": "/Applications/calibre.app/Contents/MacOS/calibre",
+        "sha256": "0ed22a76ea4d6e59dcfed84237a1ff766dbc9d7d2111845825593d5fcd5a1259"
+      },
+      {
+        "path": "/Applications/calibre.app/Contents/Frameworks/calibre-launcher.dylib",
+        "sha256": "08027f3d26025738725b5e50ce0613ab3d4e0eb5c860ff0a30725dddb7fb66e8"
+      }
+    ]
+  }
+}

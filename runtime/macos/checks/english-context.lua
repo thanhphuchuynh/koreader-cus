@@ -1,0 +1,16 @@
+package.path=assert(arg[1])..'/?.lua;'..package.path
+local C=require('english_context')
+local p='"Human, what else can you bring us? You have nothing left to offer us." After discovering this, Strength and Wisdom both left.'
+assert(C.at(p,#'"Human, what else can you bring us? You have nothing '+1)=='You have nothing left to offer us."')
+assert(C.at(p,#p-3)=='After discovering this, Strength and Wisdom both left.')
+assert(C.at(p,1)=='"Human, what else can you bring us?')
+assert(C.at('No ending punctuation here',5)=='No ending punctuation here')
+assert(C.at('Wait… what? Yes.',10)=='what?','ellipsis ends a sentence and keeps byte offsets')
+assert(C.at('She said “go.” He went.',#'She said “go.” '+1)=='He went.' and C.at('She said “go.” He went.',1)=='She said “go.”','curly closing quotes stay with their sentence')
+local lines,count=C.lines('One. Two!  Three?')
+assert(lines=='One.\nTwo!\nThree?' and count==3)
+assert(C.block('/body/DocFragment[3]/body/div/p[5]/text().12')=='/body/DocFragment[3]/body/div/p[5]')
+assert(C.block('/body/DocFragment[3]/body/p[5]/span/i/text()[1].3')=='/body/DocFragment[3]/body/p[5]','climb out of inline tags')
+assert(C.block('/body[1]/DocFragment[3]/body[1]/a[156]/text()[1].28')=='/body[1]/DocFragment[3]/body[1]/a[156]','never climb to <body>')
+assert(C.block('/body/DocFragment[3]/body/text().5')==nil and C.block(nil)==nil,'no paragraph -> nil, not the whole chapter')
+print('PASS: sentence at a word offset (quotes, ellipsis, curly quotes), paragraph lines, inline-safe block lookup')

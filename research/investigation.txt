@@ -1,0 +1,192 @@
+KOReader and Calibre investigation for a custom Kindle system
+Date: 2026-10-26
+
+Conclusion
+==========
+KOReader is the useful device-side reference: native document engines, Kindle
+input/power integration, framebuffer output, and E Ink refresh handling. Calibre
+is the useful desktop-side reference: importing, metadata, conversion, library
+management, and device transfer. Neither supplies a replacement Kindle kernel,
+bootloader-unlock method, or recovery solution.
+
+The simplest promising direction is to reuse KOReader's hardware/rendering work
+and keep Calibre's conversion work on the Mac. A smaller reading interface is a
+design option, not evidence that a rewrite or replacement OS would be faster.
+
+Scope and target identities
+===========================
+This pass answers architecture, shipped-component identity, reuse opportunities,
+and where to measure the reported lag. It is a static investigation, not a
+comprehensive audit or a performance benchmark.
+
+REA was used directly through its connected MCP tools. No REA setup changes or
+new analysis engines were needed. Native code was inspected for Mach-O metadata,
+imports and dependencies; it was not decompiled. Source code was inspected with
+normal repository tools, rather than treating Lua/Python repositories as JS apps.
+
+Targets:
+- KOReader official release v2026.07.1, kindlehf ZIP, 40,708,065 bytes.
+  https://github.com/koreader/koreader/releases/tag/v2026.07.1
+  SHA-256: 3343a916d12f36c01b59df1f65bd83ff5616e6c2a4dfbe919e7fa1400b8b1bbb
+  This package is a reference, not confirmation of the user's installed version
+  or the correct package for their unknown firmware.
+- KOReader source: 28099b3915c5de300d6215cc06e5dcf94883953f
+  Pinned koreader-base: 33b43b5b21a2f2aa7a8b5ad53b6d83d3954f51c0
+- Calibre installed application: /Applications/calibre.app, Info.plist version 9.6.0.
+- Calibre source: e596764888de1040f498f94bcf4c04cba33cf5a1
+  Source revisions are independent of the inspected installed/release builds;
+  they are not claimed to be exact source-to-binary matches.
+
+Evidence files in evidence/ retain REA's complete records, tool provenance and
+limitations. targets.json records hashes, revisions, and selected package files.
+No private Calibre library, reading history, Kindle storage, or credentials were
+read. No applications were launched and no Kindle partitions were modified.
+
+KOReader: observed architecture and behavior
+==========================================
+REA inspect_artifact inventoried the ZIP: 1,035 file occurrences, 1,029 content
+nodes, zero recorded integrity contradictions. This is archive-entry coverage;
+it does not establish runtime behavior or software authenticity.
+
+Evidence parent:
+ev_910b4f76bce9a8ed3061fbb1e9a9aefaa68a5b4ec496af187137e5da352b3136
+Export: evidence/koreader-package-evidence.json
+
+The package contains luajit (ELF), Lua device/UI code, libkoreader-cre.so and
+libwrap-mupdf.so. Eight selected text files were extracted without executing
+them into artifacts/koreader-release-text/; their hashes are in targets.json.
+
+EPUB page-turn path, established by source inspection:
+1. ReaderRolling:onGotoViewRel selects a new page or scroll position.
+2. _gotoPage changes the native document position and emits PageUpdate.
+3. ReaderView handles state and marks the dialog dirty for repaint.
+4. UIManager drains painting and refresh queues.
+5. CreDocument draws through the native CREngine binding into a BlitBuffer.
+6. The framebuffer backend sends device-specific update ioctls to the kernel.
+   Panel completion is a separate stage from document rendering.
+
+Main source navigation, relative to sources/koreader/:
+- frontend/apps/reader/modules/readerrolling.lua:897, :1178
+- frontend/apps/reader/modules/readerview.lua:185, :494, :816
+- frontend/ui/uimanager.lua:1403, :1514, :1537
+- frontend/document/credocument.lua:80, :312, :811, :1662, :2058
+- base/cre.cpp:707 (native document-render binding)
+- base/ffi/framebuffer_mxcfb.lua:633, :742, :991
+
+EPUB uses CREngine; PDF uses MuPDF and a separate PDF/reflow path. Evidence:
+frontend/document/credocument.lua and frontend/document/pdfdocument.lua:19.
+An EPUB diagnosis cannot automatically be applied to PDF or scanned-page reflow.
+
+The likely 2022 Basic is internally represented as KindleBasic4 in this source,
+despite the community KT5 label. Its initialization selects the mxcfb backend,
+configures frontlight/battery paths, and requests MediaTek fast mode. Confirmed
+in the inspected release text at frontend/device/kindle/device.lua:1793-1808.
+Fast-mode ioctl failure is logged by the backend; the source request alone does
+not prove that it succeeds on the user's device.
+
+The Kindle launcher has an existing --framework_stop option and a corresponding
+restart path. Therefore removing Amazon UI activity for an A/B measurement does
+not first require building a new OS. See platform/kindle/koreader.sh:96 and :218;
+the release copy has the same option at koreader/koreader.sh:92.
+
+Caching already exists. CreDocument configures disk and native-memory caches,
+and setupCallCache wraps drawCurrentView to reuse the current buffer when its
+tag and dimensions remain valid. The earlier base-method TODO about redraws is
+not proof that every repaint needlessly rerenders: the wrapper must be included
+in the trace. Cache limits are not preallocated RSS and should not be reported
+as measured memory consumption.
+
+Calibre: observed architecture and behavior
+==========================================
+REA inspect_macho on the installed main executable found x86_64 and arm64
+slices. The arm64 executable imports _run from calibre-launcher.dylib. That
+library links Python.framework/Versions/3.14/Python and imports Python runtime
+configuration, initialization and execution functions. This establishes a native
+launcher/Python dependency boundary, not a full trace of executed Python code.
+
+REA evidence:
+- Main executable: ev_3d2779c87c1962e21edf9b6ca1399da6400bead05f3eb0fb8818527850c04a74
+  evidence/calibre-launcher-evidence.json
+- Launcher library: ev_fc271256aac8a5f49ae881412c586be441ab058a9b3521da2282fc5604a94190
+  evidence/calibre-python-launcher-evidence.json
+
+Source navigation, relative to sources/calibre/:
+- src/calibre/ebooks/conversion/plumber.py:1188: conversion orchestration.
+  Input plugin -> HTML/OEB representation -> transforms -> output plugin.
+  Options include CSS/HTML changes, font embedding/subsetting and cleanup.
+- src/calibre/gui2/viewer/web_view.py:29: Qt WebEngine reader integration.
+  QtWebEngineCore and PyQt6 WebEngine components also exist in the installed
+  application. Presence is not proof that a given session loaded them.
+- src/calibre/db/backend.py:452, :633: APSW/SQLite and metadata.db.
+- src/calibre/db/cache.py:166: library cache/API layer.
+- src/calibre/devices/kindle/driver.py:84, :384: Kindle USB storage driver and
+  supported stock-reader formats. Do not equate those formats with KOReader's
+  sideloaded EPUB workflow; transfer/detection needs device-specific validation.
+
+Inference for this project: use Calibre on the Mac for conversion and metadata.
+Its desktop viewer architecture is a poor default for a minimal device reader.
+No RAM, startup-time, or Kindle compatibility benchmark was performed, so this
+is an architectural recommendation rather than a measured performance result.
+
+Lag investigation: hypotheses and fastest distinguishing evidence
+================================================================
+No cause is confirmed, and the following order prioritizes cheap tests rather
+than claiming which cause is most likely.
+
+1. Document-specific layout or image work.
+   Compare a small text EPUB with the problematic book. Time cold open, warm
+   reopen, ordinary page turns and a chapter boundary separately. Keep settings
+   fixed. For PDFs, compare with reflow disabled/enabled as a separate experiment.
+2. Amazon framework resource contention.
+   Compare the existing normal and framework-stop launch paths, using the same
+   book and settings. Record CPU use and free/RSS memory, not impressions alone.
+3. Input/gesture or application scheduling delay.
+   Timestamp input receipt, page-navigation entry and start of painting. A pause
+   before render submission needs a different fix from slow panel completion.
+4. Rendering/cache behavior.
+   Measure native draw time and cache hits/misses. Existing cache statistics and
+   commented timing locations in CreDocument provide focused instrumentation
+   points; do not disable caches or add another cache without measurements.
+5. Display-driver/waveform behavior.
+   Timestamp update submission and completion; compare optional animations with
+   them disabled. Confirm detected device and fast-mode ioctl status in logs.
+   Change one variable at a time and evaluate ghosting as well as latency.
+
+Keep the first diagnostic build limited to timers and logging at these stage
+boundaries. Avoid logging book text or user reading history. An ioctl completion
+timestamp is not automatically the same as physically visible panel completion.
+
+Reuse and custom-OS implications
+================================
+Reuse candidates: KOReader's board detection, input mapping, frontlight/power
+paths, framebuffer backend, document engines and cache invalidation patterns.
+Keep Calibre's import/conversion/metadata tooling on the host computer.
+
+Critical invariants to preserve:
+- Do not change framebuffer contents while a driver still requires that buffer.
+- Invalidate rendered-page caches when layout, dimensions, style or selection
+  changes; page numbers are not sufficient cache identity.
+- Preserve reading position and annotation consistency across layout changes.
+- Account for suspend/wake, charging and screen cleanup, not just page turns.
+- Profile the bottleneck before removing components or replacing the kernel.
+
+KOReader's top-level license is AGPLv3; Calibre declares GPL-3.0-only in
+pyproject.toml. Native components have their own licenses (base/cre.cpp, for
+example, carries GPLv3-or-later). Preserve notices and check the licenses of
+the actual components reused when preparing a distributable system.
+
+Status and remaining unknowns
+============================
+Answered: shipped component identities; principal reader/conversion paths;
+device-side versus desktop-side reuse; concrete performance measurement points.
+Unresolved: exact Kindle hardware/firmware, installed KOReader build, launch
+method, slow actions/books, measured stage timings, boot permissions and recovery.
+No finding establishes that the user's lag is caused by Lua, plugins, missing
+cache, Amazon's framework, or the kernel. Neither product investigation proves
+that a replacement kernel can boot on this Kindle.
+
+Next useful input: the installed KOReader version and whether lag occurs in
+menus, ordinary EPUB page turns, opening a book, or PDF scrolling. A device-side
+profiling pass can then target the matching path rather than guessing.
+
+All REA targets were closed after exporting evidence. No product code changed.

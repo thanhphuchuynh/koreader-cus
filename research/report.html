@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An evidence-led investigation of KOReader and Calibre for a custom Kindle system.">
+<title>KOReader & Calibre — Kindle investigation</title>
+<style>
+:root{color-scheme:light;--paper:#f8f7f2;--ink:#202a26;--muted:#52635a;--line:#ccd3c9;--green:#245b42;--wash:#e8eee5;--amber:#775000;--white:#fffefa}*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:28px}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.65 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:var(--green);text-underline-offset:4px;text-decoration-thickness:1px}a:hover{text-decoration-thickness:2px}a:focus-visible,summary:focus-visible{outline:3px solid var(--green);outline-offset:5px}::selection{background:#c8ddc6;color:#172f23}button{font:inherit}.skip{position:absolute;top:-100px;left:20px;padding:10px;background:var(--white);z-index:5}.skip:focus{top:10px}.layout{max-width:1390px;margin:auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:64px;padding:42px 56px 70px}.sidebar{align-self:start;position:sticky;top:34px}.brand{font:italic 28px/1.1 Georgia,serif;margin:0 0 12px}.sidebar p{font-size:13px;color:var(--muted)}nav{margin:40px 0}nav a{display:block;padding:8px 0;color:var(--ink);font-size:14px;text-decoration:none}nav a:hover{text-decoration:underline}.small{font-size:13px;color:var(--muted)}main{min-width:0;max-width:940px}.masthead{display:flex;justify-content:space-between;gap:20px;font-size:13px;color:var(--muted);padding-bottom:17px;border-bottom:1px solid var(--ink)}h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:400;line-height:1.12;text-wrap:balance}h1{font-size:clamp(48px,6.1vw,82px);letter-spacing:-.035em;margin:38px 0 24px;max-width:850px}h1 span{color:var(--green)}.lead{font-size:21px;max-width:62ch;line-height:1.55;margin-bottom:26px}.scope{display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--muted);padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.scope strong{color:var(--green);font-weight:600}section{padding-top:54px}h2{font-size:36px;letter-spacing:-.02em;margin:0 0 20px}h3{font-size:25px;margin:26px 0 10px}p{max-width:73ch;margin:0 0 18px}.recommendation{margin-top:32px;padding:25px 28px;background:var(--wash)}.recommendation h2{font-size:28px;margin-bottom:12px}.recommendation p{margin:0}.status{font-size:12px;font-weight:650;letter-spacing:.025em;text-transform:uppercase}.observed{color:var(--green)}.inferred{color:var(--amber)}.unresolved{color:#754637}.note{font-size:14px;color:var(--muted)}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:15px;text-align:left}caption{text-align:left;color:var(--muted);font-size:14px;margin-bottom:12px}th,td{border-bottom:1px solid var(--line);padding:17px 16px 17px 0;vertical-align:top}thead th{font-size:13px;color:var(--muted);font-weight:600;border-top:1px solid var(--ink)}tbody th{font-weight:600;min-width:116px}td{min-width:160px}code{font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;background:#eaece5;padding:2px 5px}.flow{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0;margin:25px 0;border-top:1px solid var(--line)}.flow li{padding:20px 20px 20px 0;border-bottom:1px solid var(--line)}.flow strong{display:block;font-size:15px}.flow small{display:block;font-size:13px;color:var(--muted);margin-top:5px}.step{font-size:12px;color:var(--green);display:block;margin-bottom:8px}.finding{padding:23px 0;border-bottom:1px solid var(--line)}.finding h3{margin:5px 0 12px}.finding p:last-child{margin-bottom:0}.finding .status{display:inline-block}.tests{padding:0;list-style:none;counter-reset:tests}.tests li{counter-increment:tests;display:grid;grid-template-columns:36px 1fr;gap:16px;padding:22px 0;border-bottom:1px solid var(--line)}.tests li:before{content:counter(tests,decimal-leading-zero);font-size:13px;color:var(--green);padding-top:4px;font-variant-numeric:tabular-nums}.tests h3{font-family:inherit;font-size:17px;font-weight:600;margin:0 0 6px}.tests p{font-size:15px;margin:0}.unknown{padding:22px 28px;background:#eee9df;margin-top:26px}.unknown h3{margin:0 0 10px}.unknown p{font-size:15px;margin:0}details{border-bottom:1px solid var(--line);padding:18px 0}summary{cursor:pointer;font-size:16px;font-weight:600}details[open] summary{margin-bottom:18px}details p,details li{font-size:14px}ul{padding-left:21px}li{margin:8px 0}.sources{font-size:14px}.sources li{padding:5px 0}.hash{word-break:break-all;font-size:12px}pre{font:14px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--white);padding:22px;border:1px solid var(--line)}footer{margin-top:55px;border-top:1px solid var(--ink);padding-top:18px;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:20px}a[href^="https"]{overflow-wrap:anywhere}@media(max-width:1000px){.layout{grid-template-columns:180px minmax(0,1fr);gap:35px;padding:30px}.flow{grid-template-columns:repeat(2,1fr)}}@media(max-width:720px){.layout{display:block;padding:22px}.sidebar{position:static}.brand{font-size:24px}.sidebar>p,.sidebar>.small{display:none}nav{display:flex;gap:18px;overflow-x:auto;margin:18px 0 28px;padding-bottom:10px;border-bottom:1px solid var(--line)}nav a{white-space:nowrap;padding:0}h1{font-size:49px;margin-top:28px}h2{font-size:31px}.lead{font-size:19px}.masthead{font-size:12px}.recommendation,.unknown{padding:22px}section{padding-top:42px}.flow{grid-template-columns:1fr 1fr}.flow li{padding-right:14px}.table-wrap{margin-right:-2px}footer{display:block}footer span{display:block;margin-top:8px}}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}@media print{body{background:white;font-size:11pt}.layout{display:block;max-width:none;padding:0}.sidebar,.skip{display:none}main{max-width:none}h1{font-size:42pt}h2{font-size:24pt}section{padding-top:28px}.recommendation,.unknown{background:#eee}.table-wrap{overflow:visible}a{color:inherit}details{break-inside:avoid}.flow li,.finding{break-inside:avoid}footer{margin-top:25px}}
+</style></head><body>
+<a class="skip" href="#report">Skip to report</a><div class="layout"><aside class="sidebar"><p class="brand">Kindle, reconsidered.</p><p>A technical field report<br>26 October 2026</p><nav aria-label="Report sections"><a href="#overview">Overview</a><a href="#comparison">Product comparison</a><a href="#reader">Inside KOReader</a><a href="#calibre">Inside Calibre</a><a href="#lag">Investigating the lag</a><a href="#direction">Custom OS direction</a><a href="#evidence">Sources & evidence</a></nav><div class="small">Built from source inspection<br>and REA artifact evidence.</div></aside>
+<main id="report"><header id="overview"><div class="masthead"><span>KOReader × Calibre</span><span>Static investigation · 26 Oct 2026</span></div><h1>A better Kindle starts<br>with <span>what we can prove.</span></h1><p class="lead">Two open-source products, two distinct roles. What their internals tell us about building a custom Kindle system—and what they cannot yet tell us about the lag.</p><div class="scope"><span><strong>Inspected</strong> source & shipped artifacts</span><span><strong>Preserved</strong> REA evidence</span><span>No Kindle runtime measurements</span></div></header>
+<div class="recommendation"><h2>Reuse the difficult parts.</h2><p>Use KOReader’s device integration and document engines as the starting point on the Kindle. Keep Calibre’s book preparation on the Mac. Measure the bottleneck before deciding what a new interface or OS should replace.</p></div>
+<section id="comparison"><h2>One reader. One workshop.</h2><div class="table-wrap"><table><caption>Where each product fits in a custom Kindle system</caption><thead><tr><th scope="col">Area</th><th scope="col">KOReader</th><th scope="col">Calibre</th></tr></thead><tbody><tr><th scope="row">Primary role</th><td>Read on the device</td><td>Prepare and manage books on a computer</td></tr><tr><th scope="row">Core stack</th><td>LuaJIT UI, native CREngine and MuPDF</td><td>Python, native components, Qt desktop UI</td></tr><tr><th scope="row">Rendering</th><td>Framebuffer and E Ink driver updates</td><td>Qt WebEngine desktop reader</td></tr><tr><th scope="row">Best reuse</th><td>Device detection, input, power, document rendering</td><td>Conversion, metadata and library workflows</td></tr><tr><th scope="row">OS foundation</th><td>Runs on an existing system</td><td>Runs on an existing system</td></tr></tbody></table></div><p class="note" style="margin-top:16px">Neither product provides a replacement Kindle kernel, a bootloader-unlock method, or a proven recovery path for your device.</p></section>
+<section id="reader"><h2>Inside a KOReader page turn</h2><p>The source separates navigation, document rendering and physical display updates. A pause at each stage has a different cause.</p><ol class="flow" aria-label="EPUB page-turn sequence"><li><span class="step">1 / Navigate</span><strong>Select the next page</strong><small>ReaderRolling updates the document position.</small></li><li><span class="step">2 / Notify</span><strong>Emit PageUpdate</strong><small>ReaderView updates its state and requests repainting.</small></li><li><span class="step">3 / Schedule</span><strong>Drain paint queues</strong><small>UIManager coordinates painting and refreshing.</small></li><li><span class="step">4 / Render</span><strong>Draw the document</strong><small>CREngine paints EPUB content into a pixel buffer.</small></li><li><span class="step">5 / Submit</span><strong>Send the display update</strong><small>The framebuffer backend calls the kernel driver.</small></li><li><span class="step">6 / Display</span><strong>Wait for the panel</strong><small>Driver completion and visible panel completion are distinct measurements.</small></li></ol>
+<div class="finding"><span class="status observed">Observed in code</span><h3>The Kindle already has a direct display path.</h3><p>The likely 2022 Basic is called <code>KindleBasic4</code> inside KOReader, despite the community name KT5. Its initialization selects the framebuffer backend and requests MediaTek fast mode. An ioctl request is not proof that fast mode succeeds on your particular device.</p><p class="note"><a href="sources/koreader/frontend/device/kindle/device.lua">Device implementation</a> · <a href="sources/koreader/base/ffi/framebuffer_mxcfb.lua">Framebuffer backend</a></p></div>
+<div class="finding"><span class="status observed">Observed in code</span><h3>Caching is already part of the design.</h3><p>KOReader uses disk caches, native-memory caches and a draw wrapper that can reuse a valid page buffer. A TODO in a lower-level draw method is not evidence that every repaint unnecessarily redraws the page.</p><p class="note"><a href="sources/koreader/frontend/document/credocument.lua">CREngine integration and cache wrapper</a></p></div>
+<div class="finding"><span class="status observed">Observed in code</span><h3>EPUB and PDF take different paths.</h3><p>EPUB uses CREngine. PDF uses MuPDF, with separate reflow handling. Slow PDF scrolling does not establish a problem in EPUB page rendering.</p><p class="note"><a href="sources/koreader/frontend/document/pdfdocument.lua">PDF implementation</a></p></div>
+<div class="finding"><span class="status observed">Observed in code</span><h3>Amazon’s framework can be compared separately.</h3><p>The existing Kindle launcher supports <code>--framework_stop</code> and a restart path. This provides a way to measure framework contention before committing to an OS replacement.</p><p class="note"><a href="sources/koreader/platform/kindle/koreader.sh">Kindle launcher</a></p></div></section>
+<section id="calibre"><h2>Calibre belongs at the preparation stage.</h2><p>REA inspected the installed Calibre 9.6.0 executable and launcher library. The main executable has arm64 and x86_64 slices; its arm64 slice delegates to a launcher linked to Python 3.14.</p><p>Source inspection establishes the conversion pipeline: <strong>input plugin → HTML/OEB representation → transforms → output plugin.</strong> The desktop reader integrates Qt WebEngine; library storage uses SQLite through APSW.</p><p class="status inferred">Architectural recommendation</p><p>Use Calibre’s conversion and metadata workflows on the Mac. Porting its desktop viewer would bring a desktop browser-engine architecture into a device reader. No performance benchmark was run to quantify that tradeoff.</p><p class="note"><a href="sources/calibre/src/calibre/ebooks/conversion/plumber.py">Conversion pipeline</a> · <a href="sources/calibre/src/calibre/gui2/viewer/web_view.py">Desktop reader</a> · <a href="sources/calibre/src/calibre/db/backend.py">Library database</a></p></section>
+<section id="lag"><h2>Find the missing time.</h2><p>The investigation identifies measurement points, not a confirmed cause. These experiments are ordered by how cheaply they separate possible explanations.</p><ol class="tests"><li><div><h3>Separate the book from the reader</h3><p>Compare a small text EPUB with the slow book. Measure cold opening, warm reopening, regular turns and chapter boundaries separately.</p></div></li><li><div><h3>Compare framework activity</h3><p>Use the normal and framework-stop launch paths with the same book and settings. Record CPU use and memory alongside timing.</p></div></li><li><div><h3>Time the input path</h3><p>Record input receipt, navigation entry and paint start. A pause before rendering needs a different fix from a slow screen update.</p></div></li><li><div><h3>Measure rendering and cache behavior</h3><p>Record native drawing time and cache hits or misses. Investigate invalidation before adding another cache or removing the existing one.</p></div></li><li><div><h3>Measure the display path</h3><p>Record update submission and completion. Compare optional animations, check fast-mode errors, and assess ghosting as well as latency.</p></div></li></ol><div class="unknown"><h3>The cause remains open.</h3><p>We have not measured your Kindle or confirmed its installed KOReader version. This evidence does not establish that Lua, plugins, Amazon’s framework, cache behavior or the kernel causes your lag.</p></div></section>
+<section id="direction"><h2>A practical foundation for your OS</h2><p>A custom Linux system remains the wider goal. These products inform its reading and book-preparation layers; boot permissions, drivers, suspend and recovery still need device-specific investigation.</p><div class="table-wrap"><table><caption>Reuse decisions suggested by the evidence</caption><thead><tr><th scope="col">Layer</th><th scope="col">Starting point</th><th scope="col">What remains to prove</th></tr></thead><tbody><tr><th scope="row">Books on the Mac</th><td>Calibre conversion and metadata</td><td>Transfer workflow and resulting book performance</td></tr><tr><th scope="row">Reading on Kindle</th><td>KOReader engines and hardware integration</td><td>Actual bottleneck and the value of a smaller interface</td></tr><tr><th scope="row">System foundation</th><td>Separate boot and hardware investigation</td><td>Boot access, recovery, charging and suspend</td></tr></tbody></table></div><h3>Invariants worth keeping</h3><ul><li>Preserve framebuffer contents while the driver still needs them.</li><li>Invalidate page caches when layout, dimensions, styles or selection change.</li><li>Keep reading position and annotations consistent after layout changes.</li><li>Handle charging, suspend, wake and screen cleanup alongside reading.</li></ul><p class="note">KOReader’s top-level license is AGPLv3; Calibre declares GPL-3.0-only. Native components carry their own licenses. Check the actual components reused when preparing a distribution.</p></section>
+<section id="evidence"><h2>Follow the evidence.</h2><p>REA supplied archive inventory and native binary metadata. Source inspection supplied the behavior traces. No native decompilation, application execution or Kindle profiling was performed.</p><details><summary>Targets, versions and source revisions</summary><ul><li>KOReader reference package: <a href="https://github.com/koreader/koreader/releases/tag/v2026.07.1">v2026.07.1, Kindle hard-float ZIP</a>, 40,708,065 bytes. Its suitability for your unknown firmware is unconfirmed.</li><li>KOReader source: <a href="https://github.com/koreader/koreader/tree/28099b3915c5de300d6215cc06e5dcf94883953f"><code>28099b3915c5</code></a>; base dependency <code>33b43b5b21a2</code>.</li><li>Calibre installed version: 9.6.0. Source revision: <a href="https://github.com/kovidgoyal/calibre/tree/e596764888de1040f498f94bcf4c04cba33cf5a1"><code>e596764888de</code></a>.</li></ul><p>Source checkouts and shipped artifacts are independent references, not claimed exact source-to-binary matches.</p><p class="hash">KOReader ZIP SHA-256: 3343a916d12f36c01b59df1f65bd83ff5616e6c2a4dfbe919e7fa1400b8b1bbb</p></details>
+<details><summary>REA evidence exports</summary><ul class="sources"><li><a href="evidence/koreader-package-evidence.json">KOReader package inventory</a> — 1,035 file occurrences; archive-entry coverage, not runtime proof.</li><li><a href="evidence/calibre-launcher-evidence.json">Calibre executable inspection</a> — Mach-O architecture, dependencies and imports.</li><li><a href="evidence/calibre-python-launcher-evidence.json">Calibre Python launcher inspection</a> — native dependency boundary.</li><li><a href="evidence/targets.json">Target manifest</a> — hashes, source revisions and extracted-file identities.</li></ul><p>Zero recorded archive integrity contradictions does not establish authenticity or runtime correctness. Native symbol inventories may be incomplete for stripped or toolchain-hidden symbols. The JSON exports retain the tool’s limitations.</p></details>
+<details><summary>Full original investigation</summary><p>The complete original report is embedded below, so the report’s text remains available offline even if this HTML file is moved alone. <a href="investigation.txt">Open the plain-text version</a>.</p><pre>KOReader and Calibre investigation for a custom Kindle system
+Date: 2026-10-26
+
+Conclusion
+==========
+KOReader is the useful device-side reference: native document engines, Kindle
+input/power integration, framebuffer output, and E Ink refresh handling. Calibre
+is the useful desktop-side reference: importing, metadata, conversion, library
+management, and device transfer. Neither supplies a replacement Kindle kernel,
+bootloader-unlock method, or recovery solution.
+
+The simplest promising direction is to reuse KOReader&#x27;s hardware/rendering work
+and keep Calibre&#x27;s conversion work on the Mac. A smaller reading interface is a
+design option, not evidence that a rewrite or replacement OS would be faster.
+
+Scope and target identities
+===========================
+This pass answers architecture, shipped-component identity, reuse opportunities,
+and where to measure the reported lag. It is a static investigation, not a
+comprehensive audit or a performance benchmark.
+
+REA was used directly through its connected MCP tools. No REA setup changes or
+new analysis engines were needed. Native code was inspected for Mach-O metadata,
+imports and dependencies; it was not decompiled. Source code was inspected with
+normal repository tools, rather than treating Lua/Python repositories as JS apps.
+
+Targets:
+- KOReader official release v2026.07.1, kindlehf ZIP, 40,708,065 bytes.
+  https://github.com/koreader/koreader/releases/tag/v2026.07.1
+  SHA-256: 3343a916d12f36c01b59df1f65bd83ff5616e6c2a4dfbe919e7fa1400b8b1bbb
+  This package is a reference, not confirmation of the user&#x27;s installed version
+  or the correct package for their unknown firmware.
+- KOReader source: 28099b3915c5de300d6215cc06e5dcf94883953f
+  Pinned koreader-base: 33b43b5b21a2f2aa7a8b5ad53b6d83d3954f51c0
+- Calibre installed application: /Applications/calibre.app, Info.plist version 9.6.0.
+- Calibre source: e596764888de1040f498f94bcf4c04cba33cf5a1
+  Source revisions are independent of the inspected installed/release builds;
+  they are not claimed to be exact source-to-binary matches.
+
+Evidence files in evidence/ retain REA&#x27;s complete records, tool provenance and
+limitations. targets.json records hashes, revisions, and selected package files.
+No private Calibre library, reading history, Kindle storage, or credentials were
+read. No applications were launched and no Kindle partitions were modified.
+
+KOReader: observed architecture and behavior
+==========================================
+REA inspect_artifact inventoried the ZIP: 1,035 file occurrences, 1,029 content
+nodes, zero recorded integrity contradictions. This is archive-entry coverage;
+it does not establish runtime behavior or software authenticity.
+
+Evidence parent:
+ev_910b4f76bce9a8ed3061fbb1e9a9aefaa68a5b4ec496af187137e5da352b3136
+Export: evidence/koreader-package-evidence.json
+
+The package contains luajit (ELF), Lua device/UI code, libkoreader-cre.so and
+libwrap-mupdf.so. Eight selected text files were extracted without executing
+them into artifacts/koreader-release-text/; their hashes are in targets.json.
+
+EPUB page-turn path, established by source inspection:
+1. ReaderRolling:onGotoViewRel selects a new page or scroll position.
+2. _gotoPage changes the native document position and emits PageUpdate.
+3. ReaderView handles state and marks the dialog dirty for repaint.
+4. UIManager drains painting and refresh queues.
+5. CreDocument draws through the native CREngine binding into a BlitBuffer.
+6. The framebuffer backend sends device-specific update ioctls to the kernel.
+   Panel completion is a separate stage from document rendering.
+
+Main source navigation, relative to sources/koreader/:
+- frontend/apps/reader/modules/readerrolling.lua:897, :1178
+- frontend/apps/reader/modules/readerview.lua:185, :494, :816
+- frontend/ui/uimanager.lua:1403, :1514, :1537
+- frontend/document/credocument.lua:80, :312, :811, :1662, :2058
+- base/cre.cpp:707 (native document-render binding)
+- base/ffi/framebuffer_mxcfb.lua:633, :742, :991
+
+EPUB uses CREngine; PDF uses MuPDF and a separate PDF/reflow path. Evidence:
+frontend/document/credocument.lua and frontend/document/pdfdocument.lua:19.
+An EPUB diagnosis cannot automatically be applied to PDF or scanned-page reflow.
+
+The likely 2022 Basic is internally represented as KindleBasic4 in this source,
+despite the community KT5 label. Its initialization selects the mxcfb backend,
+configures frontlight/battery paths, and requests MediaTek fast mode. Confirmed
+in the inspected release text at frontend/device/kindle/device.lua:1793-1808.
+Fast-mode ioctl failure is logged by the backend; the source request alone does
+not prove that it succeeds on the user&#x27;s device.
+
+The Kindle launcher has an existing --framework_stop option and a corresponding
+restart path. Therefore removing Amazon UI activity for an A/B measurement does
+not first require building a new OS. See platform/kindle/koreader.sh:96 and :218;
+the release copy has the same option at koreader/koreader.sh:92.
+
+Caching already exists. CreDocument configures disk and native-memory caches,
+and setupCallCache wraps drawCurrentView to reuse the current buffer when its
+tag and dimensions remain valid. The earlier base-method TODO about redraws is
+not proof that every repaint needlessly rerenders: the wrapper must be included
+in the trace. Cache limits are not preallocated RSS and should not be reported
+as measured memory consumption.
+
+Calibre: observed architecture and behavior
+==========================================
+REA inspect_macho on the installed main executable found x86_64 and arm64
+slices. The arm64 executable imports _run from calibre-launcher.dylib. That
+library links Python.framework/Versions/3.14/Python and imports Python runtime
+configuration, initialization and execution functions. This establishes a native
+launcher/Python dependency boundary, not a full trace of executed Python code.
+
+REA evidence:
+- Main executable: ev_3d2779c87c1962e21edf9b6ca1399da6400bead05f3eb0fb8818527850c04a74
+  evidence/calibre-launcher-evidence.json
+- Launcher library: ev_fc271256aac8a5f49ae881412c586be441ab058a9b3521da2282fc5604a94190
+  evidence/calibre-python-launcher-evidence.json
+
+Source navigation, relative to sources/calibre/:
+- src/calibre/ebooks/conversion/plumber.py:1188: conversion orchestration.
+  Input plugin -&gt; HTML/OEB representation -&gt; transforms -&gt; output plugin.
+  Options include CSS/HTML changes, font embedding/subsetting and cleanup.
+- src/calibre/gui2/viewer/web_view.py:29: Qt WebEngine reader integration.
+  QtWebEngineCore and PyQt6 WebEngine components also exist in the installed
+  application. Presence is not proof that a given session loaded them.
+- src/calibre/db/backend.py:452, :633: APSW/SQLite and metadata.db.
+- src/calibre/db/cache.py:166: library cache/API layer.
+- src/calibre/devices/kindle/driver.py:84, :384: Kindle USB storage driver and
+  supported stock-reader formats. Do not equate those formats with KOReader&#x27;s
+  sideloaded EPUB workflow; transfer/detection needs device-specific validation.
+
+Inference for this project: use Calibre on the Mac for conversion and metadata.
+Its desktop viewer architecture is a poor default for a minimal device reader.
+No RAM, startup-time, or Kindle compatibility benchmark was performed, so this
+is an architectural recommendation rather than a measured performance result.
+
+Lag investigation: hypotheses and fastest distinguishing evidence
+================================================================
+No cause is confirmed, and the following order prioritizes cheap tests rather
+than claiming which cause is most likely.
+
+1. Document-specific layout or image work.
+   Compare a small text EPUB with the problematic book. Time cold open, warm
+   reopen, ordinary page turns and a chapter boundary separately. Keep settings
+   fixed. For PDFs, compare with reflow disabled/enabled as a separate experiment.
+2. Amazon framework resource contention.
+   Compare the existing normal and framework-stop launch paths, using the same
+   book and settings. Record CPU use and free/RSS memory, not impressions alone.
+3. Input/gesture or application scheduling delay.
+   Timestamp input receipt, page-navigation entry and start of painting. A pause
+   before render submission needs a different fix from slow panel completion.
+4. Rendering/cache behavior.
+   Measure native draw time and cache hits/misses. Existing cache statistics and
+   commented timing locations in CreDocument provide focused instrumentation
+   points; do not disable caches or add another cache without measurements.
+5. Display-driver/waveform behavior.
+   Timestamp update submission and completion; compare optional animations with
+   them disabled. Confirm detected device and fast-mode ioctl status in logs.
+   Change one variable at a time and evaluate ghosting as well as latency.
+
+Keep the first diagnostic build limited to timers and logging at these stage
+boundaries. Avoid logging book text or user reading history. An ioctl completion
+timestamp is not automatically the same as physically visible panel completion.
+
+Reuse and custom-OS implications
+================================
+Reuse candidates: KOReader&#x27;s board detection, input mapping, frontlight/power
+paths, framebuffer backend, document engines and cache invalidation patterns.
+Keep Calibre&#x27;s import/conversion/metadata tooling on the host computer.
+
+Critical invariants to preserve:
+- Do not change framebuffer contents while a driver still requires that buffer.
+- Invalidate rendered-page caches when layout, dimensions, style or selection
+  changes; page numbers are not sufficient cache identity.
+- Preserve reading position and annotation consistency across layout changes.
+- Account for suspend/wake, charging and screen cleanup, not just page turns.
+- Profile the bottleneck before removing components or replacing the kernel.
+
+KOReader&#x27;s top-level license is AGPLv3; Calibre declares GPL-3.0-only in
+pyproject.toml. Native components have their own licenses (base/cre.cpp, for
+example, carries GPLv3-or-later). Preserve notices and check the licenses of
+the actual components reused when preparing a distributable system.
+
+Status and remaining unknowns
+============================
+Answered: shipped component identities; principal reader/conversion paths;
+device-side versus desktop-side reuse; concrete performance measurement points.
+Unresolved: exact Kindle hardware/firmware, installed KOReader build, launch
+method, slow actions/books, measured stage timings, boot permissions and recovery.
+No finding establishes that the user&#x27;s lag is caused by Lua, plugins, missing
+cache, Amazon&#x27;s framework, or the kernel. Neither product investigation proves
+that a replacement kernel can boot on this Kindle.
+
+Next useful input: the installed KOReader version and whether lag occurs in
+menus, ordinary EPUB page turns, opening a book, or PDF scrolling. A device-side
+profiling pass can then target the matching path rather than guessing.
+
+All REA targets were closed after exporting evidence. No product code changed.
+</pre></details>
+<p class="note" style="margin-top:22px">The page uses no external fonts, scripts, analytics or network requests. Local evidence and source links work when this file stays in the research folder. Use your browser’s Print command to save a PDF.</p></section><footer><span>Kindle investigation · Prepared with REA and source inspection</span><span>Evidence before a rewrite.</span></footer></main></div></body></html>

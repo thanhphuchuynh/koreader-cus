@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "mode": "phrase",
+      "seconds": 1.38,
+      "success": false,
+      "http_status": 429,
+      "error": "Provider rate limit or credit limit reached. Wait or choose another free model in AI settings.",
+      "provider_error_code": 429
+    }
+  ],
+  "model": "google/gemma-4-26b-a4b-it:free",
+  "runtime": "Bundled macOS KOReader LuaJIT; real LuaSocket/LuaSec; headless identity only"
+}

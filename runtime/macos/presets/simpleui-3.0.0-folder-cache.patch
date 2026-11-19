@@ -1,0 +1,22 @@
+--- research/sources/simpleui-release/simpleui.koplugin/features/library/sui_foldercovers.lua	2026-10-22 18:56:02
++++ runtime/macos/test-data/plugins/simpleui.koplugin/features/library/sui_foldercovers.lua	2026-10-26 16:11:58
+@@ -273,15 +273,15 @@
+             return _orig_genItemTableFromPath(fc, path)
+         end
+         local key = _itc_key(path, fc)
+-        if _itc and _itc.key == key then return _itc.t end
+-        local result = _orig_genItemTableFromPath(fc, path)
++        if _itc and _itc.key == key then return _itc.t, _itc.readable end
++        local result, readable = _orig_genItemTableFromPath(fc, path)
+         -- Don't cache virtual series views: their synthetic path has no reliable mtime.
+         if not (result and result._sg_is_series_view) then
+-            _itc = { key = key, t = result }
++            _itc = { key = key, t = result, readable = readable }
+         else
+             _itc = nil
+         end
+-        return result
++        return result, readable
+     end
+ end
+ 

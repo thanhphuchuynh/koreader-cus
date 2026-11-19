@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <rect width="32" height="32" fill="white"/>
+  <!-- A 32px grid, stepped edges and solid fills: no curves or soft strokes. -->
+  <path d="M3 1H20V2H21V3H22V4H23V5H24V6H25V7H26V8H27V9H28V10H29V31H3Z" fill="black"/>
+  <path d="M5 3H18V12H27V29H5Z" fill="white"/>
+  <path d="M20 4H21V5H22V6H23V7H24V8H25V9H26V10H20Z" fill="white"/>
+  <path d="M8 23V18H9V16H11V14H14V13H18V12H24V18H23V21H21V23H18V24H12V25H10V27H7V25H9V23Z" fill="black"/>
+  <path d="M10 23V21H12V19H14V17H16V15H18V14H20V16H18V18H16V20H14V22H12V24H10Z" fill="white"/>
+</svg>

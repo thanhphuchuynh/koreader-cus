@@ -1,0 +1,83 @@
+AI setup in the UI:
+Settings > AI settings > Choose OpenRouter free model. Available from Home, Library and while reading.
+Choose Gemma 4 26B A4B (default), Gemma 4 31B, or Automatic free model.
+Enter your OpenRouter API key and Save. A blank key keeps the existing key for the same URL. The base URL and model remain editable
+for other OpenAI-compatible providers. Choosing a preset does not save settings
+or make a request. On the same base URL, a blank key keeps the existing key.
+Changing provider with a blank key clears the previous provider's saved key.
+Kindle USB storage cannot enforce Unix permissions. With your approval, the UI
+can save a plaintext key under /mnt/us; it remains readable over USB. The UI
+discloses this before saving. Private permissions are required elsewhere.
+No key is bundled or copied by this update.
+
+AI setup using local files
+
+1. Edit test-data/settings/english-ai.lua:
+   base_url = your provider's HTTPS API prefix (often ending in /v1)
+   model = the exact provider model ID
+
+2. Put only your API key in test-data/settings/english-ai.key.
+   One line is fine; a trailing newline is accepted. No quotes or variable name.
+   This file is private (0600), stored as plaintext. Do not share or commit it.
+
+3. Start KOReader with Launch English Preview.command.
+   Hold and drag to select multiple words; release to translate automatically.
+   Single-word taps open the dictionary. Sentence help also offers Translate or Explain.
+   You can also use word lookup > More > Sentence help.
+
+File edits are picked up on the next AI action after saving the files.
+KOReader was restarted to load file-reload support.
+No API request is made by saving configuration. Releasing a multiword selection
+sends that selection automatically for translation. The loading popup identifies
+the provider and offers Cancel. Sentence help previews the destination and passage
+before explicit Translate or Explain actions. Only the selected passage is sent.
+
+Use an OpenAI-compatible /chat/completions provider with Bearer authentication.
+Example base URL: https://api.your-provider.com/v1
+Do not include /chat/completions in the base URL. No live provider has been
+configured or contacted by this setup.
+
+When AI is not configured, Translate uses KOReader's built-in Google Translate
+from English to Vietnamese. No API key is needed, but Wi-Fi is required. The
+loading popup identifies Google for automatic translation; Sentence help shows
+the provider before its Translate action. Explain sentence remains disabled
+until AI setup is complete. Configured AI request failures do not switch to
+Google automatically.
+
+Learning vocabulary:
+Tap Save word in the compact dictionary to keep its meaning, book and available
+original sentence offline. Saved status survives reopening the reader.
+Open the reader menu > Review 5 words. Reveal meaning, then choose Again or
+Remembered. Earlier review dates come first; practice can include words not yet
+due. Closing a card does not grade it. Reviews use KOReader's existing scheduler.
+Native vocabulary and review progress remain in settings/vocabulary_builder.sqlite3;
+English reading snapshots use an additional english_word_details table in that file.
+
+English tools update:
+- Word popup > Explain here: explicit AI explanation of the word in its sentence.
+- Translation > Phrase help: explicit AI help with idioms and phrasal verbs.
+- English tools > Translation history: open successful results offline.
+  Cache identities include the passage, action, focused word, provider and model.
+  The last 100 results are kept locally; up to 16 KB input and 64 KB output each.
+  API keys and failed requests are never stored in this history.
+  Clear saved translations in the history menu to delete the local cache.
+- Review 5 words hides the saved word in its sentence before revealing it.
+- English tools > Performance checks: run dictionary/popup timing, then measure
+  the next page turn. Measurements run only when requested and are saved in
+  test-data/settings/english-performance.lua. They include software paint and
+  refresh submission, not the physical E Ink settling time.
+- A USB storage connection cannot execute these checks. Eject, open a book and
+  run them on the Kindle. No Kindle timing is claimed until it has been run.
+
+English speech - native Kindle compatibility test:
+Word popup and sentence/translation popups offer Listen / Stop for the original
+English text. Closing the popup, closing the book, or suspending stops speech.
+English tools > Test English speech plays a fixed sample only when you tap Listen.
+Pair Bluetooth headphones/speaker through Kindle Settings before testing.
+This version uses the existing Kindle voice and current rate through KOReader's
+bundled LIPC binding. It makes no network requests and needs no speech API key.
+It does not install a voice pack, change pairing, or add the full audiobook plugin.
+Native speech availability depends on Kindle firmware and installed voice support;
+actual playback on this Kindle is not yet verified. Failure reports an error.
+Speech is limited to 2 KB per passage and stops after at most 3 minutes.
+Adjustable speech rate is not implemented in this initial native-service test.

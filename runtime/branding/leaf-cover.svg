@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="960" viewBox="0 0 32 48" shape-rendering="crispEdges">
+ <rect width="32" height="48" fill="white"/>
+ <path d="M1 1H20V2H21V3H22V4H23V5H24V6H25V7H26V8H27V9H28V10H29V11H30V12H31V47H1Z" fill="black"/>
+ <path d="M3 3H18V14H29V45H3Z" fill="white"/>
+ <path d="M20 4H21V5H22V6H23V7H24V8H25V9H26V10H27V11H28V12H20Z" fill="white"/>
+ <path d="M6 31V25H7V22H9V20H12V18H16V17H27V24H26V28H24V31H21V33H16V34H11V35H9V38H5V35H7V33H8V31Z" fill="black"/>
+ <path d="M9 33V30H11V28H13V26H15V24H17V22H19V20H22V22H20V24H18V26H16V28H14V30H12V32H11V33Z" fill="white"/>
+ <g fill="black">
+  <rect x="7" y="39" width="1" height="1"/>
+  <rect x="7" y="40" width="1" height="1"/>
+  <rect x="7" y="41" width="1" height="1"/>
+  <rect x="7" y="42" width="1" height="1"/>
+  <rect x="7" y="43" width="1" height="1"/>
+  <rect x="8" y="43" width="1" height="1"/>
+  <rect x="9" y="43" width="1" height="1"/>
+  <rect x="12" y="39" width="1" height="1"/>
+  <rect x="13" y="39" width="1" height="1"/>
+  <rect x="14" y="39" width="1" height="1"/>
+  <rect x="12" y="40" width="1" height="1"/>
+  <rect x="12" y="41" width="1" height="1"/>
+  <rect x="13" y="41" width="1" height="1"/>
+  <rect x="12" y="42" width="1" height="1"/>
+  <rect x="12" y="43" width="1" height="1"/>
+  <rect x="13" y="43" width="1" height="1"/>
+  <rect x="14" y="43" width="1" height="1"/>
+  <rect x="18" y="39" width="1" height="1"/>
+  <rect x="17" y="40" width="1" height="1"/>
+  <rect x="19" y="40" width="1" height="1"/>
+  <rect x="17" y="41" width="1" height="1"/>
+  <rect x="18" y="41" width="1" height="1"/>
+  <rect x="19" y="41" width="1" height="1"/>
+  <rect x="17" y="42" width="1" height="1"/>
+  <rect x="19" y="42" width="1" height="1"/>
+  <rect x="17" y="43" width="1" height="1"/>
+  <rect x="19" y="43" width="1" height="1"/>
+  <rect x="22" y="39" width="1" height="1"/>
+  <rect x="23" y="39" width="1" height="1"/>
+  <rect x="24" y="39" width="1" height="1"/>
+  <rect x="22" y="40" width="1" height="1"/>
+  <rect x="22" y="41" width="1" height="1"/>
+  <rect x="23" y="41" width="1" height="1"/>
+  <rect x="22" y="42" width="1" height="1"/>
+  <rect x="22" y="43" width="1" height="1"/>
+ </g>
+</svg>
