@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaf IELTS Reading</title>
+<style>
+:root{--ink:#181818;--muted:#555;--line:#bbb;--soft:#e6e6e6;--bg:#eceeed;--paper:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,sans-serif}
+main{max-width:1000px;margin:auto;padding:24px 16px;display:flex;gap:32px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.device{width:450px;max-width:100%;height:600px;background:var(--paper);border:1px solid #aaa;position:relative;overflow:hidden;display:flex;flex-direction:column;flex-shrink:0}
+.bar{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--ink);font-size:13px;min-height:40px}
+.bar .grow{flex:1}
+.tabs{display:flex;border:1px solid var(--ink)}
+.tabs button{border:0;background:#fff;padding:5px 12px;font:13px system-ui;cursor:pointer;color:inherit}
+.tabs button.sel{background:var(--ink);color:#fff}
+.timer{font-variant-numeric:tabular-nums;font-weight:600}
+.plain{border:0;background:none;font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;color:inherit;padding:4px}
+.view{flex:1;overflow:auto;padding:18px 22px}
+.passage h2{font:19px/1.3 Georgia,serif;margin:0 0 12px}
+.passage p{font:15.5px/1.65 Georgia,serif;margin:0 0 12px}
+.passage .w{cursor:pointer}
+.passage .w:hover{background:#eee}
+.passage.pick .w:hover{background:var(--ink);color:#fff}
+.passage .ev{background:#ddd;outline:1px solid #888}
+.qhead{font-size:12px;color:var(--muted);margin:0 0 4px;letter-spacing:.02em}
+.qtext{font:15px/1.5 Georgia,serif;margin:0 0 8px}
+.q{padding:10px 0 14px;border-bottom:1px solid var(--soft)}
+.tfng{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--ink)}
+.tfng button{border:0;border-right:1px solid var(--ink);background:#fff;padding:9px 0;font:13px system-ui;cursor:pointer;color:inherit}
+.tfng button:last-child{border-right:0}
+.tfng button.sel{background:var(--ink);color:#fff}
+.blank{display:inline-block;min-width:90px;border:0;border-bottom:2px solid var(--ink);padding:0 6px;font:15px Georgia,serif;cursor:pointer;background:#fff;text-align:center;color:inherit}
+.blank.active{background:var(--ink);color:#fff}
+.blank:empty::after{content:'tap';color:#999;font:12px system-ui}
+.blank.active:empty::after{color:#ccc}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+.foot{display:flex;border-top:1px solid var(--ink)}
+.foot button{flex:1;border:0;border-right:1px solid var(--line);background:#fff;padding:11px 0;font:13px system-ui;cursor:pointer;color:inherit}
+.foot button:last-child{border-right:0}
+.foot button.primary{background:var(--ink);color:#fff}
+.dots{display:flex;gap:4px;flex-wrap:wrap}
+.dots span{width:20px;height:20px;border:1px solid var(--ink);font-size:11px;display:grid;place-items:center}
+.dots span.done{background:var(--ink);color:#fff}
+.score{font:34px Georgia,serif;margin:4px 0}
+.res{padding:9px 0;border-bottom:1px solid var(--soft);font-size:14px}
+.res b{font-weight:600}
+.mark{display:inline-block;width:18px;font-weight:700}
+.popup{position:absolute;left:12px;right:12px;bottom:14px;background:#fff;border:1px solid var(--ink);padding:10px 12px}
+.popup .t{font:18px Georgia,serif;margin:0}
+.popup .s{font-size:12px;color:var(--muted)}
+.popup p{margin:8px 0;font-size:14px}
+.home .card{border:1px solid var(--ink);padding:14px;margin:10px 0;cursor:pointer}
+.home .card h3{font:17px Georgia,serif;margin:0 0 4px}
+.home .meta{font-size:12px;color:var(--muted)}
+.mode{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--ink);margin:14px 0}
+.mode button{border:0;border-right:1px solid var(--ink);background:#fff;padding:10px;font:13px system-ui;cursor:pointer;text-align:left;color:inherit}
+.mode button:last-child{border-right:0}
+.mode button.sel{background:var(--ink);color:#fff}
+.mode small{display:block;opacity:.75;font-size:11px;margin-top:2px}
+aside{flex:1;min-width:260px;max-width:440px}
+aside h1{font:24px/1.25 Georgia,serif;margin:0 0 8px}
+aside p,aside li{color:#333}
+aside ol{padding-left:20px}
+aside li{margin:6px 0}
+.note{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+</style>
+</head>
+<body>
+<main>
+<div class="device" id="device"></div>
+<aside>
+  <h1>IELTS Reading on Leaf</h1>
+  <p>Mockup at Kindle size. Grayscale, discrete screens, big tap targets.</p>
+  <ol>
+    <li><b>Start:</b> pick <b>Practice</b> (20-min timer, word tools off, checked at the end) or <b>Study</b> (no timer, tap words for dictionary/translation).</li>
+    <li><b>Passage ⇄ Questions</b> switch at the top replaces the side-by-side layout. The square dots show answered questions.</li>
+    <li><b>TRUE / FALSE / NOT GIVEN:</b> one tap.</li>
+    <li><b>One-word blanks:</b> tap the blank, the passage opens, tap the word. No keyboard. (Keyboard stays available under “Type”.)</li>
+    <li><b>Results:</b> score, band estimate, and <b>Show in passage</b> shades the sentence that holds the answer.</li>
+  </ol>
+  <p class="note">The passage and questions are original sample text in IELTS style. Real tests would be pasted on the Mac and turned into a Leaf test file.</p>
+  <button class="plain" id="reset">Reset mockup</button>
+</aside>
+</main>
+<script>
+'use strict';
+const passage=[
+ 'Night lights and sea turtles',
+ 'Every summer, female loggerhead turtles return to the beaches where they hatched to lay their eggs. Weeks later, the hatchlings dig their way out of the sand at night and head for the sea, guided by the brightest horizon.',
+ 'On natural coasts that horizon is the ocean, which reflects moonlight. On developed coasts, however, street lamps and hotels shine more brightly than the water, and many hatchlings crawl inland instead. Researchers in Florida estimate that lighting disorients tens of thousands of hatchlings every year.',
+ 'The solution is surprisingly simple. In 2015, the town of Boca Grande replaced its white lamps with amber ones, which turtles barely notice, and asked residents to close their curtains after dark. Within three seasons, disorientation reports fell by more than half.',
+ 'Not everyone welcomed the change. Some business owners complained that the dimmer streets felt unsafe, and the town had to add motion sensors near restaurants. Volunteers now patrol the beach at dawn, counting tracks to check whether the hatchlings reached the water.'
+];
+const questions=[
+ {n:1,type:'tfng',text:'Hatchlings normally find the sea by moving towards the brightest part of the sky.',key:'TRUE',ev:[1,1]},
+ {n:2,type:'tfng',text:'Most hatchlings in Florida are disoriented by artificial light.',key:'NOT GIVEN',ev:[2,2]},
+ {n:3,type:'tfng',text:'Boca Grande first changed its lights in 2015.',key:'TRUE',ev:[3,1]},
+ {n:4,type:'gap',before:'New lamps produce',after:'light.',key:'amber',ev:[3,1]},
+ {n:5,type:'gap',before:'Residents were asked to close their',after:'.',key:'curtains',ev:[3,1]},
+ {n:6,type:'gap',before:'Volunteers count',after:'on the beach each morning.',key:'tracks',ev:[4,2]},
+];
+const st={screen:'home',mode:'practice',tab:'passage',answers:{},active:null,secs:20*60,popup:null,evidence:null,timer:null};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+function sentences(p){return p.match(/[^.!?]+[.!?]+/g)||[p]}
+function passageHTML(){
+ return passage.map((p,i)=>{
+  if(i===0)return `<h2>${esc(p)}</h2>`;
+  return '<p>'+sentences(p).map((s,si)=>{
+   const ev=st.evidence&&st.evidence[0]===i&&st.evidence[1]===si+1;
+   const words=s.split(/(\s+)/).map(t=>/\S/.test(t)?`<span class="w" data-w="${esc(t)}">${esc(t)}</span>`:t).join('');
+   return `<span class="${ev?'ev':''}">${words}</span>`;
+  }).join('')+'</p>';
+ }).join('');
+}
+function dots(){return '<div class="dots">'+questions.map(q=>`<span class="${st.answers[q.n]?'done':''}">${q.n}</span>`).join('')+'</div>'}
+function bar(){
+ return `<div class="bar"><div class="tabs"><button data-tab="passage" class="${st.tab==='passage'?'sel':''}">Passage</button><button data-tab="questions" class="${st.tab==='questions'?'sel':''}">Questions</button></div>
+ <span class="grow"></span>${st.mode==='practice'?`<span class="timer">${fmt(st.secs)}</span>`:'<span style="font-size:12px;color:#555">Study</span>'}</div>`;
+}
+function render(){
+ const d=$('device');let h='';
+ if(st.screen==='home'){
+  h=`<div class="bar"><b>IELTS Reading</b></div><div class="view home">
+  <div class="meta">Saved tests</div>
+  <div class="card" data-open="1"><h3>Night lights and sea turtles</h3><div class="meta">Academic · 6 questions · 20 min · not started</div></div>
+  <div class="card" style="opacity:.5"><h3>Add a test…</h3><div class="meta">Paste on the Mac → Leaf makes a test file</div></div>
+  <div class="mode"><button data-mode="practice" class="${st.mode==='practice'?'sel':''}">Practice<small>Timer · tools off · score</small></button><button data-mode="study" class="${st.mode==='study'?'sel':''}">Study<small>No timer · tap words</small></button></div>
+  </div><div class="foot"><button class="primary" data-open="1">Start</button></div>`;
+ }else if(st.screen==='test'){
+  h=bar();
+  if(st.tab==='passage'){
+   const picking=st.active!=null;
+   h+=`<div class="view passage ${picking?'pick':''}">${picking?`<div class="hint" style="margin:0 0 10px;padding:6px 8px;border:1px solid #181818">Tap the word for question ${st.active}</div>`:''}${passageHTML()}</div>`;
+  }else{
+   h+=`<div class="view">${dots()}`+questions.map(q=>{
+    if(q.type==='tfng')return `<div class="q"><p class="qhead">QUESTION ${q.n}</p><p class="qtext">${esc(q.text)}</p><div class="tfng">${['TRUE','FALSE','NOT GIVEN'].map(o=>`<button data-q="${q.n}" data-a="${o}" class="${st.answers[q.n]===o?'sel':''}">${o}</button>`).join('')}</div></div>`;
+    return `<div class="q"><p class="qhead">QUESTION ${q.n} · ONE WORD ONLY</p><p class="qtext">${esc(q.before)} <span class="blank ${st.active===q.n?'active':''}" data-gap="${q.n}">${esc(st.answers[q.n]||'')}</span> ${esc(q.after)}</p></div>`;
+   }).join('')+`<p class="hint">Blanks: tap a blank, then tap the word in the passage.</p></div>`;
+  }
+  h+=`<div class="foot"><button data-tab="${st.tab==='passage'?'questions':'passage'}">${st.tab==='passage'?'Questions →':'← Passage'}</button><button class="primary" data-finish>Finish</button></div>`;
+ }else if(st.screen==='results'){
+  let right=0;questions.forEach(q=>{if((st.answers[q.n]||'').toLowerCase()===q.key.toLowerCase())right++});
+  const band=right>=6?'≈ 9':right>=5?'≈ 7.5':right>=4?'≈ 6.5':right>=3?'≈ 5.5':'≈ 4.5';
+  h=`<div class="bar"><b>Results</b><span class="grow"></span><span>${st.mode==='practice'?'Time '+fmt(20*60-st.secs):'Study'}</span></div><div class="view">
+  <div class="score">${right} / ${questions.length}</div><div class="hint">Band estimate ${band} (scaled from a full 40-question test; rough)</div>`+
+  questions.map(q=>{const a=st.answers[q.n]||'—',ok=a.toLowerCase()===q.key.toLowerCase();
+   return `<div class="res"><span class="mark">${ok?'✓':'✗'}</span><b>${q.n}.</b> ${esc(a)}${ok?'':` → <b>${esc(q.key)}</b>`} <button class="plain" data-ev="${q.n}">Show in passage</button></div>`}).join('')+
+  `</div><div class="foot"><button data-retry>Try again</button><button class="primary" data-home>Done</button></div>`;
+ }else if(st.screen==='evidence'){
+  h=`<div class="bar"><button class="plain" data-back-results>← Results</button><span class="grow"></span><span style="font-size:12px">Question ${st.evq}</span></div><div class="view passage">${passageHTML()}</div>`;
+ }
+ if(st.popup)h+=`<div class="popup"><p class="t">${esc(st.popup)}</p><div class="s">tap word · dictionary (Study mode)</div><p>Meaning shown here, same Leaf popup as normal reading.</p><button class="plain" data-close-pop>Close</button></div>`;
+ d.innerHTML=h;
+ if(st.screen==='evidence'){const e=d.querySelector('.ev');if(e)e.scrollIntoView({block:'center'})}
+}
+function tick(){if(st.screen==='test'&&st.mode==='practice'&&st.secs>0){st.secs--;const t=document.querySelector('.timer');if(t)t.textContent=fmt(st.secs)}}
+$('device').addEventListener('click',e=>{
+ const b=e.target.closest('[data-tab],[data-mode],[data-open],[data-q],[data-gap],[data-finish],[data-ev],[data-retry],[data-home],[data-back-results],[data-close-pop],.w');
+ if(!b)return;
+ if(b.dataset.mode){st.mode=b.dataset.mode}
+ else if(b.dataset.open){st.screen='test';st.tab='passage';if(!st.timer)st.timer=setInterval(tick,1000)}
+ else if(b.dataset.tab){st.tab=b.dataset.tab;if(st.tab==='questions')st.active=null}
+ else if(b.dataset.q){st.answers[b.dataset.q]=b.dataset.a}
+ else if(b.dataset.gap){st.active=+b.dataset.gap;st.tab='passage'}
+ else if(b.classList.contains('w')){
+  const word=b.dataset.w.replace(/[^A-Za-z'-]/g,'');
+  if(st.active!=null){st.answers[st.active]=word.toLowerCase();st.active=null;st.tab='questions'}
+  else if(st.mode==='study'){st.popup=word}
+  else return;
+ }
+ else if(b.dataset.closePop!==undefined){st.popup=null}
+ else if(b.dataset.finish!==undefined){st.screen='results';st.active=null;st.popup=null}
+ else if(b.dataset.ev){const q=questions.find(x=>x.n==b.dataset.ev);st.evidence=q.ev;st.evq=q.n;st.screen='evidence'}
+ else if(b.dataset.backResults!==undefined){st.screen='results';st.evidence=null}
+ else if(b.dataset.retry!==undefined){st.answers={};st.secs=20*60;st.screen='test';st.tab='passage'}
+ else if(b.dataset.home!==undefined){st.screen='home'}
+ render();
+});
+$('reset').onclick=()=>{Object.assign(st,{screen:'home',mode:'practice',tab:'passage',answers:{},active:null,secs:20*60,popup:null,evidence:null});render()};
+render();
+</script>
+</body>
+</html>
