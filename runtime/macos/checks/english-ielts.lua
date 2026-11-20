@@ -10,7 +10,6 @@ assert(I.normalize(' Footprints. ')=='footprints' and I.normalize('farmers’')=
 assert(I.fold('“A”  —  b’s')=='"A" - b\'s')
 local r=I.score(t,{[1]='true',[2]='TRUE',[3]={'B','A'},[5]=' Amber.',[6]='motion sensor'})
 assert(r.right==5 and r.total==6 and #r.rows==6 and r.rows[2].ok==false and r.rows[2].correct=='FALSE' and r.rows[6].ok==true)
-local g={type='gap',words=1,answer='footprints',accept={'footprint'}}
 local g1={version=1,passages={{n=1,from=1,to=1},{n=2,from=2,to=4}},questions={{n=1,type='gap',words=1,answer='footprints',accept={'footprint'}},{n=2,type='choice',answer='B'},{n={3,4},type='multi',answers={'B','D'}}}}
 local t2=assert(I.parse(J.encode(g1)))
 assert(I.score(t2,{[1]='Footprint'}).right==1 and I.score(t2,{[1]='tracks'}).right==0)
