@@ -6,14 +6,18 @@ local shown={}
 local UI={show=function(_,w) shown[#shown+1]=w end,close=function() end}
 local Widget={}
 function Widget:new(t) return t or {} end
+local Scroll={}
+function Scroll:new(t) t=t or {};t.off={x=0,y=0};function t:getScrolledOffset() return self.off end;function t:setScrolledOffset(o) self.off=o end;return t end
+local lastScroll
 package.preload['ui/uimanager']=function() return UI end
 package.preload['device']=function() return {screen={getWidth=function() return 600 end,getHeight=function() return 800 end,scaleBySize=function(_,s) return s end}} end
-for _,n in ipairs({'container/inputcontainer','container/framecontainer','container/scrollablecontainer','verticalgroup','verticalspan','textboxwidget','buttontable'}) do
+for _,n in ipairs({'container/inputcontainer','container/framecontainer','button','horizontalgroup','verticalgroup','verticalspan','textboxwidget','buttontable'}) do
   package.preload['ui/widget/'..n]=function() return Widget end
 end
 package.preload['ui/font']=function() return {getFace=function() return {} end} end
 package.preload['ffi/blitbuffer']=function() return {COLOR_WHITE=255} end
 package.preload['ui/geometry']=function() return Widget end
+package.preload['ui/widget/container/scrollablecontainer']=function() return Scroll end
 local P=require('english_ielts_panel')
 local S=require('english_ielts_session')
 local function store() local d={} return {readSetting=function(_,k) return d[k] end,saveSetting=function(_,k,v) d[k]=v end} end
@@ -35,12 +39,15 @@ P.show(opts)
 local dots=walk(shown[#shown],function(t) return type(t.text)=='string' and t.text:find('□',1,true) end)
 local _,a=dots.text:gsub('■','');local _,b=dots.text:gsub('□','');local count=a+b;assert(count==test.total,'dots='..count)
 assert(not button('Passage 1') and not has('[ Passage'),'single passage: no switch')
-assert(button('TRUE') and not has('[ TRUE ]'))
+local function selected(l) return walk(shown[#shown],function(t) return t.text==l and t.preselect end) end
+assert(button('TRUE') and not selected('TRUE'))
+shown[#shown]._scroll.off={x=0,y=250}
 button('TRUE')()
-assert(session:answer(1)=='TRUE' and has('[ TRUE ]'),'selected must show')
+assert(session:answer(1)=='TRUE' and selected('TRUE'),'selected must be preselected (inverted)')
+assert(shown[#shown]._scroll.off.y==250 and shown[#shown].cropping_widget==shown[#shown]._scroll,'scroll kept, cropping_widget set')
 button('B')();button('A')();button('C')()
 assert(#session:answer(3)==2 and session:answer(3)[1]=='B','multi capped at picks')
-button('[ B ]')();assert(#session:answer(3)==1)
+button('B')();assert(#session:answer(3)==1)
 button('6  ____')() ;assert(picked==6)
 button('← Passage')();assert(done)
 session:setAnswer(5,'ember');session:setAnswer(6,'three big words');P.show(opts)
@@ -50,7 +57,7 @@ local g={version=1,minutes=20,passages={{n=1,from=1,to=1},{n=2,from=2,to=2}},gro
   questions={{n=1,type='choice',options={'A','B'},answer='A',text='one'},{n=2,type='choice',options={'C','D'},answer='C',text='two'}}}
 local t2=assert(I.parse(J.encode(g)));local s2=S.new(t2,store())
 P.show({test=t2,session=s2,passage=1,on_pick=function()end,on_evidence=function()end,on_passage=function()end})
-assert(button('[ Passage 1 ]') and button('Passage 2') and has('G1') and not has('G2'))
+assert(walk(shown[#shown],function(t) return t.text=='Passage 1' and t.preselect end) and button('Passage 2') and has('G1') and not has('G2'))
 button('Passage 2')();assert(has('G2') and not has('G1'))
 -- results
 P.show(opts);session:setAnswer(1,'TRUE');button('Finish')()

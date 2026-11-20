@@ -13,6 +13,8 @@ function M.show(o)
   local VerticalGroup=require('ui/widget/verticalgroup')
   local VerticalSpan=require('ui/widget/verticalspan')
   local TextBox=require('ui/widget/textboxwidget')
+  local Button=require('ui/widget/button')
+  local HGroup=require('ui/widget/horizontalgroup')
   local ButtonTable=require('ui/widget/buttontable')
   local Font=require('ui/font')
   local Geom=require('ui/geometry')
@@ -29,9 +31,16 @@ function M.show(o)
   end
   local function gap() col[#col+1]=VerticalSpan:new{width=pad} end
   local function buttons(row) col[#col+1]=ButtonTable:new{width=inner,buttons={row}} end
+  -- Equal-width row; Button preselect = inverted (black fill, white text) for the selected one.
+  local function choices(row)
+    local g=HGroup:new{}
+    for _,b in ipairs(row) do g[#g+1]=Button:new{text=b.text,callback=b.callback,preselect=b.selected,width=math.floor(inner/#row),show_parent=widget} end
+    col[#col+1]=g
+  end
   local function redraw(extra)
-    UI:close(widget)
     local n={};for k,v in pairs(o) do n[k]=v end
+    n.offset=widget._scroll and widget._scroll:getScrolledOffset()
+    UI:close(widget)
     for k,v in pairs(extra or {}) do n[k]=v end
     M.show(n)
   end
@@ -45,7 +54,6 @@ function M.show(o)
   end
 
   if o.results then
-    session:pause(now());session:finish()
     local answers={}
     for _,q in ipairs(test.questions) do answers[first(q)]=session:answer(first(q)) end
     local r=I.score(test,answers)
@@ -65,7 +73,7 @@ function M.show(o)
       buttons{{text='Show in passage',callback=function() o.on_evidence(test.byNumber[row.n]) end}}
     end
     gap()
-    buttons{{text='Try again',callback=function() session:reset();redraw{results=false} end},
+    buttons{{text='Try again',callback=function() session:reset();redraw{results=false,offset=false} end},
       {text='Done',callback=function() UI:close(widget);o.on_passage() end}}
   else
     local multi=#test.passages>1
@@ -74,9 +82,9 @@ function M.show(o)
     for n=1,test.total do dots[#dots+1]=filled(n) and '■' or '□' end
     local head={{text='← Passage',callback=function() UI:close(widget);o.on_passage() end}}
     if multi then for _,p in ipairs(test.passages) do
-      head[#head+1]={text=(p.n==pn and '[ Passage %d ]' or 'Passage %d'):format(p.n),callback=function() redraw{passage=p.n} end}
+      head[#head+1]={text=('Passage %d'):format(p.n),callback=function() redraw{passage=p.n,offset=false} end,selected=p.n==pn}
     end end
-    buttons(head)
+    choices(head)
     text(table.concat(dots,' ')..'   '..session:footer(now()),15)
     gap()
     local P=multi and test.passages[pn] or nil
@@ -103,7 +111,7 @@ function M.show(o)
               if q.type=='multi' then for _,l in ipairs(list or {}) do sel[l]=true end elseif list then sel[list]=true end
               text(('%s. %s'):format(type(q.n)=='table' and q.n[1]..'-'..q.n[#q.n] or n,q.text or ''))
               for _,opt in ipairs(q.options or {}) do
-                row[#row+1]={text=sel[opt] and '[ '..opt..' ]' or opt,callback=function()
+                row[#row+1]={text=opt,selected=sel[opt],callback=function()
                   if q.type=='multi' then
                     local l,out,had={}, {},false
                     for _,x in ipairs(list or {}) do if x==opt then had=true else out[#out+1]=x end end
@@ -113,17 +121,19 @@ function M.show(o)
                   redraw()
                 end}
               end
-              buttons(row)
+              choices(row)
             end
           end
         end
         gap()
       end
     end
-    buttons{{text='Finish',callback=function() redraw{results=true} end}}
+    buttons{{text='Finish',callback=function() session:pause(now());session:finish();redraw{results=true,offset=false} end}}
   end
-  widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,
-    Scroll:new{dimen=Geom:new{w=w,h=h},FrameContainer:new{padding=pad,bordersize=0,col}}}
+  local scroll=Scroll:new{dimen=Geom:new{w=w,h=h},show_parent=widget,FrameContainer:new{padding=pad,bordersize=0,col}}
+  widget._scroll=scroll;widget.cropping_widget=scroll
+  if o.offset then scroll:setScrolledOffset(o.offset) end
+  widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,scroll}
   widget._col=col
   UI:show(widget,'full')
   return widget
