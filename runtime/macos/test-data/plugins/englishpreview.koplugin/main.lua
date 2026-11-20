@@ -351,8 +351,8 @@ function Preview:ieltsType()
 end
 
 -- Jump to a question's evidence inside its passage chapter. findAllText searches the whole book
--- (findText only searches near the current page) and crengine keeps its hits highlighted
--- until the next page turn or tap.
+-- (findText only searches near the current page); the hit is drawn with getTextFromXPointers
+-- and stays until the next page turn or tap.
 local MIN_FALLBACK=20 -- the quote-free fallback must be long enough not to match a stray fragment
 function Preview:showEvidence(q)
     local st=self._ielts
@@ -377,9 +377,12 @@ function Preview:showEvidence(q)
                 if not p or k==p.n then
                     logger.info('Leaf: ielts evidence found',n,pattern)
                     st.evidence_page=nil -- the jump fires PageUpdate; it must not clear the new hit
-                    self.ui.link:onGotoLink({xpointer=hit.start})
+                    -- As ReaderSearch (rolling): keep Go back, jump, draw the selection, repaint.
+                    if self.ui.link and self.ui.link.addCurrentLocationToStack then self.ui.link:addCurrentLocationToStack() end
+                    self.ui.rolling:onGotoXPointer(hit.start)
+                    doc:getTextFromXPointers(hit.start,hit['end'],true)
                     st.evidence_page=doc:getCurrentPage()
-                    UIManager:setDirty(self.ui.dialog,'ui')
+                    UIManager:setDirty(nil,'ui')
                     return true
                 end
             end
@@ -396,7 +399,7 @@ function Preview:clearIeltsEvidence()
     if not st or not st.evidence_page then return end
     st.evidence_page=nil
     pcall(self.ui.document.clearSelection,self.ui.document)
-    UIManager:setDirty(self.ui.dialog,'ui')
+    UIManager:setDirty(nil,'ui')
 end
 
 function Preview:onPageUpdate(page)

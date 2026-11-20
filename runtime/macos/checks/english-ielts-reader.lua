@@ -5,10 +5,11 @@ local f=assert(io.open(arg[1]..'/../../../../ielts-sample.json'));local raw=f:re
 local d=J.decode(raw);for _,p in ipairs(d.passages) do p.paragraphs=nil end
 local KEY=J.encode(d)
 local clock=1000;os.time=function() return clock end
+trace=nil
 local shown,closed,scheduled,unscheduled,dirty={},{},{},0,0
 local UI={show=function(_,w) shown[#shown+1]=w end,close=function(_,w) closed[#closed+1]=w end,
   scheduleIn=function(_,s,fn) scheduled[#scheduled+1]={s,fn} end,unschedule=function() unscheduled=unscheduled+1 end,
-  setDirty=function() dirty=dirty+1 end}
+  setDirty=function(_,w,mode) dirty=dirty+1;if trace then trace[#trace+1]='dirty:'..tostring(w)..':'..tostring(mode) end end}
 local Widget={};function Widget:new(t) t=t or {};t.handleEvent=t.handleEvent or function() end;return t end
 package.preload['ui/widget/container/widgetcontainer']=function() return {extend=function(_,t) return t end} end
 package.preload['ui/uimanager']=function() return UI end
@@ -71,12 +72,16 @@ local function reader(content)
   r.hits=function(pat)
     if r.other:find(pat,1,true) then return {{start='/body/DocFragment[2]/body/p[5]/text().0'}} end
     if not r.passage:find(pat,1,true) then return {} end
-    return {{start='/body/DocFragment[1]/body/p[3]/text().4'},{start='/body/DocFragment[2]/body/p[1]/text().0'}}
+    return {{start='/body/DocFragment[1]/body/p[3]/text().4',['end']='/body/DocFragment[1]/body/p[3]/text().40'},{start='/body/DocFragment[2]/body/p[1]/text().0',['end']='/body/DocFragment[2]/body/p[1]/text().9'}}
   end
   r.events={}
-  r.ui={menu={registerToMainMenu=function() end},handleEvent=function(_,e) r.events[#r.events+1]=e;if r.boom then error('boom') end;return true end,rolling=true,highlight=highlight,document=doc,doc_settings=r.store,
+  r.ui={menu={registerToMainMenu=function() end},handleEvent=function(_,e) r.events[#r.events+1]=e;if r.boom then error('boom') end;return true end,highlight=highlight,document=doc,doc_settings=r.store,
     dictionary={addToDictButtons=function() end},view={footer=footer},
-    link={onGotoLink=function(_,l) r.gotos[#r.gotos+1]=l.xpointer;r.page=r.jumpTo or r.page;r.plugin:onPageUpdate(r.page) end}}
+    link={addCurrentLocationToStack=function() r.stacked=(r.stacked or 0)+1 end}}
+  -- Like ReaderRolling: the jump emits PageUpdate synchronously.
+  r.ui.rolling={onGotoXPointer=function(_,xp) r.gotos[#r.gotos+1]=xp;r.page=r.jumpTo or r.page
+    if trace then trace[#trace+1]='goto' end;r.plugin:onPageUpdate(r.page) end}
+  doc.getTextFromXPointers=function(_,a,b,draw) if trace then trace[#trace+1]='draw:'..a..':'..b..':'..tostring(draw) end end
   r.plugin=setmetatable({ui=r.ui},{__index=Preview})
   r.plugin:init()
   r.tap=function(word) r.word=word;return highlight:onTap(nil,{pos={x=300,y=220}}) end
@@ -165,9 +170,15 @@ r.frag=1
 -- Second Show in passage from another page keeps its new highlight (PageUpdate fires during the jump).
 r.jumpTo=20;panels[#panels].on_evidence({n=5,evidence="replaced its white lamps with 'amber' ones"})
 assert(r.selected and r.page==20,'first jump highlighted')
+trace={}
 r.jumpTo=30;panels[#panels].on_evidence({n=5,evidence="replaced its white lamps with 'amber' ones"})
 assert(r.selected and r.page==30,'second jump must keep its highlight')
+assert(table.concat(trace,'|')=='goto|draw:/body/DocFragment[1]/body/p[3]/text().4:/body/DocFragment[1]/body/p[3]/text().40:true|dirty:nil:ui',
+  'jump, draw the selection, repaint like ReaderSearch: '..table.concat(trace,'|'))
+assert(r.stacked and r.stacked>0,'Go back location kept')
+trace={}
 r.plugin:onPageUpdate(31);assert(not r.selected,'turn after second jump clears')
+assert(trace[1]=='dirty:nil:ui','clearing repaints');trace=nil
 -- A hit only in another chapter: not shown, and its stray highlight is cleared.
 before=#shown;local g=#r.gotos
 panels[#panels].on_evidence({n=5,evidence='Only the second passage mentions coral reefs'})
