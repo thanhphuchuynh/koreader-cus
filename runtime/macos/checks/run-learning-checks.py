@@ -14,6 +14,7 @@ if (checks/'english-speech.lua').exists():cases.append(('english-speech.lua',plu
 if (checks/'english-voca.lua').exists():cases.append(('english-voca.lua',plugin))
 if (checks/'english-context.lua').exists():cases.append(('english-context.lua',plugin))
 if (checks/'english-ielts.lua').exists():cases.append(('english-ielts.lua',plugin))
+if (checks/'english-ielts-panel.lua').exists():cases.append(('english-ielts-panel.lua',plugin))
 if (checks/'english-phrases.lua').exists():cases.append(('english-phrases.lua',plugin))
 cases.append(('simpleui-ai-settings.lua',plugin.parent/'simpleui.koplugin/screens/sui_settings_window.lua'))
 for name,arg in cases:
