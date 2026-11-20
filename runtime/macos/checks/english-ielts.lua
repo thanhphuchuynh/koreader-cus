@@ -1,0 +1,23 @@
+package.path=assert(arg[1])..'/?.lua;'..package.path
+local J=require('json')
+local I=require('english_ielts')
+local f=assert(io.open(arg[1]..'/../../../../ielts-sample.json'));local raw=f:read('*a');f:close()
+local d=J.decode(raw);for _,p in ipairs(d.passages) do p.paragraphs=nil end
+local t=assert(I.parse(J.encode(d)))
+assert(t.total==6 and t.byNumber[4]==t.byNumber[3] and t.byNumber[5].answer=='amber' and I.passageOf(t,6).n==1 and I.passageOf(t,7)==nil)
+assert(I.parse('{')==nil and I.parse('{"version":2,"questions":[{}]}')==nil and I.parse('{"version":1,"questions":[]}')==nil)
+assert(I.normalize(' Footprints. ')=='footprints' and I.normalize('farmers’')=="farmers'" and I.normalize('A  –\n B')=='a - b')
+assert(I.fold('“A”  —  b’s')=='"A" - b\'s')
+local r=I.score(t,{[1]='true',[2]='TRUE',[3]={'B','A'},[5]=' Amber.',[6]='motion sensor'})
+assert(r.right==5 and r.total==6 and #r.rows==6 and r.rows[2].ok==false and r.rows[2].correct=='FALSE' and r.rows[6].ok==true)
+local g={type='gap',words=1,answer='footprints',accept={'footprint'}}
+local g1={version=1,passages={{n=1,from=1,to=1},{n=2,from=2,to=4}},questions={{n=1,type='gap',words=1,answer='footprints',accept={'footprint'}},{n=2,type='choice',answer='B'},{n={3,4},type='multi',answers={'B','D'}}}}
+local t2=assert(I.parse(J.encode(g1)))
+assert(I.score(t2,{[1]='Footprint'}).right==1 and I.score(t2,{[1]='tracks'}).right==0)
+local s=I.score(t2,{[1]='footprints',[2]='b',[3]={'D','A'}})
+assert(s.right==3 and s.total==4 and s.passages[1].right==1 and s.passages[1].total==1 and s.passages[2].right==2 and s.passages[2].total==3)
+assert(I.overLimit({type='gap',words=1},'two words')==true and I.overLimit({type='gap',words=1},'word')==false)
+assert(I.band(40,40)==9 and I.band(30,40)==7)
+local b,rough=I.band(9,13);assert(b==6.5 and rough==true)
+local b2,r2=I.band(2,40);assert(b2==2 and r2==false)
+print('PASS: ielts parse, normalize, gap/choice/multi scoring, per-passage totals, band estimate')
