@@ -50,8 +50,8 @@ local function reader(content)
   local doc={getWordFromPosition=function() return {sbox={x=280,y=200,w=100,h=40}} end,
     getDocumentFileContent=function(_,p) assert(p=='META-INF/leaf-ielts.json');return content end,
     getXPointer=function() return '/body/DocFragment['..r.frag..']/body/p[2]/text().0' end,
-    getCurrentPage=function() return 7 end,
-    clearSelection=function() r.cleared=r.cleared+1 end,
+    getCurrentPage=function() return r.page end,
+    clearSelection=function() r.cleared=r.cleared+1;r.selected=false end,
     -- Like cre.cpp: findText only searches from/around the current position (reverse=dir==1);
     -- findAllText searches the whole book.
     findText=function(_,pat,origin,reverse)
@@ -65,17 +65,18 @@ local function reader(content)
     end,
     findAllText=function(_,pat,ci,ctx,max,regex)
       assert(ci==true and max>0 and not regex)
-      local h=r.hits(pat);return #h>0 and h or nil
+      local h=r.hits(pat);if #h>0 then r.selected=true;return h end
     end}
-  r.frag=1
+  r.frag=1;r.page=7;r.other='Only the second passage mentions coral reefs here.'
   r.hits=function(pat)
+    if r.other:find(pat,1,true) then return {{start='/body/DocFragment[2]/body/p[5]/text().0'}} end
     if not r.passage:find(pat,1,true) then return {} end
     return {{start='/body/DocFragment[1]/body/p[3]/text().4'},{start='/body/DocFragment[2]/body/p[1]/text().0'}}
   end
   r.events={}
   r.ui={menu={registerToMainMenu=function() end},handleEvent=function(_,e) r.events[#r.events+1]=e;if r.boom then error('boom') end;return true end,rolling=true,highlight=highlight,document=doc,doc_settings=r.store,
     dictionary={addToDictButtons=function() end},view={footer=footer},
-    link={onGotoLink=function(_,l) r.gotos[#r.gotos+1]=l.xpointer end}}
+    link={onGotoLink=function(_,l) r.gotos[#r.gotos+1]=l.xpointer;r.page=r.jumpTo or r.page;r.plugin:onPageUpdate(r.page) end}}
   r.plugin=setmetatable({ui=r.ui},{__index=Preview})
   r.plugin:init()
   r.tap=function(word) r.word=word;return highlight:onTap(nil,{pos={x=300,y=220}}) end
@@ -161,6 +162,16 @@ before=#shown
 panels[#panels].on_evidence({n=5,evidence="with 'amber' ones"})
 assert(#shown==before+1 and #r.gotos==1,'short quote-free fallback must not match a stray fragment')
 r.frag=1
+-- Second Show in passage from another page keeps its new highlight (PageUpdate fires during the jump).
+r.jumpTo=20;panels[#panels].on_evidence({n=5,evidence="replaced its white lamps with 'amber' ones"})
+assert(r.selected and r.page==20,'first jump highlighted')
+r.jumpTo=30;panels[#panels].on_evidence({n=5,evidence="replaced its white lamps with 'amber' ones"})
+assert(r.selected and r.page==30,'second jump must keep its highlight')
+r.plugin:onPageUpdate(31);assert(not r.selected,'turn after second jump clears')
+-- A hit only in another chapter: not shown, and its stray highlight is cleared.
+before=#shown;local g=#r.gotos
+panels[#panels].on_evidence({n=5,evidence='Only the second passage mentions coral reefs'})
+assert(#r.gotos==g and #shown==before+1 and r.selected==false,'other-chapter hit cleared, not shown')
 print('PASS: evidence found book-wide across quote styles in its chapter, cleared on page turn')
 
 -- Time up: once.

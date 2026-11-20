@@ -376,6 +376,7 @@ function Preview:showEvidence(q)
                 local k=tonumber(tostring(hit.start):match('DocFragment%[(%d+)%]'))
                 if not p or k==p.n then
                     logger.info('Leaf: ielts evidence found',n,pattern)
+                    st.evidence_page=nil -- the jump fires PageUpdate; it must not clear the new hit
                     self.ui.link:onGotoLink({xpointer=hit.start})
                     st.evidence_page=doc:getCurrentPage()
                     UIManager:setDirty(self.ui.dialog,'ui')
