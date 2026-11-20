@@ -8,7 +8,8 @@ function M.fold(s)
 end
 -- Edge punctuation is stripped except the apostrophe, so "farmers'" keeps its possessive.
 local EDGE='[%s!-&(-/:-@%[%\\%]%^_`{-~]+'
-function M.normalize(s) return (M.fold(s):lower():gsub('^'..EDGE,''):gsub(EDGE..'$','')) end
+function M.trim(s) return (s:gsub('^'..EDGE,''):gsub(EDGE..'$','')) end
+function M.normalize(s) return M.trim(M.fold(s):lower()) end
 
 local function numbers(q) return type(q.n)=='table' and q.n or {q.n} end
 
@@ -49,10 +50,16 @@ function M.score(t,answers)
     if q.type=='multi' then
       local picked,seen={},{}
       for _,l in ipairs(answers[ns[1]] or {}) do l=M.normalize(l);if not seen[l] then seen[l]=true;picked[#picked+1]=l end end
-      local want={};for _,l in ipairs(q.answers) do want[M.normalize(l)]=true end
+      local want,got={},{};for _,l in ipairs(q.answers) do want[M.normalize(l)]=true end
+      for _,l in ipairs(picked) do got[l]=true end
+      -- Wrong rows show the key letters that were not picked, one per row.
+      local missing={};for _,l in ipairs(q.answers) do if not got[M.normalize(l)] then missing[#missing+1]=l end end
+      local w=0
       for i,n in ipairs(ns) do
         local p=picked[i]
-        rows[#rows+1]={n=n,answer=p and p:upper() or '',correct=q.answers[i],ok=p~=nil and want[p]==true}
+        local ok=p~=nil and want[p]==true
+        if not ok then w=w+1 end
+        rows[#rows+1]={n=n,answer=p and p:upper() or '',correct=ok and p:upper() or missing[w] or table.concat(missing,', '),ok=ok}
       end
     else
       local a=answers[ns[1]] or ''

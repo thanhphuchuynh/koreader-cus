@@ -40,6 +40,7 @@ function M.show(o)
   local function redraw(extra)
     local n={};for k,v in pairs(o) do n[k]=v end
     n.offset=widget._scroll and widget._scroll:getScrolledOffset()
+    n.refresh='ui' -- in-panel redraws: no flashing full refresh
     UI:close(widget)
     for k,v in pairs(extra or {}) do n[k]=v end
     M.show(n)
@@ -63,7 +64,7 @@ function M.show(o)
     local band,rough=I.band(r.right,r.total)
     text('Band ≈ '..band..(rough and ' (rough)' or ''))
     if session:mode()=='practice' then
-      local used=test.minutes*60-session:remaining(now())
+      local used=session:elapsed(now())
       text(('Time used %02d:%02d'):format(math.floor(used/60),used%60))
     end
     gap()
@@ -79,7 +80,8 @@ function M.show(o)
     local multi=#test.passages>1
     local pn=o.passage or 1
     local dots={}
-    for n=1,test.total do dots[#dots+1]=filled(n) and '■' or '□' end
+    local ns={};for n in pairs(test.byNumber) do ns[#ns+1]=n end;table.sort(ns)
+    for _,n in ipairs(ns) do dots[#dots+1]=filled(n) and '■' or '□' end
     local head={{text='← Passage',callback=function() UI:close(widget);o.on_passage() end}}
     if multi then for _,p in ipairs(test.passages) do
       head[#head+1]={text=('Passage %d'):format(p.n),callback=function() redraw{passage=p.n,offset=false} end,selected=p.n==pn}
@@ -88,57 +90,74 @@ function M.show(o)
     text(table.concat(dots,' ')..'   '..session:footer(now()),15)
     gap()
     local P=multi and test.passages[pn] or nil
-    for _,g in ipairs(test.groups or {}) do
-      if not P or g.from>=P.from and g.from<=P.to then
-        text(g.title,22,'tfont');text(g.instructions)
-        for _,l in ipairs(g.list or {}) do text(l) end
-        if g.text then
-          text((g.text:gsub('{(%d+)}',function(n)
-            n=tonumber(n);local a=session:answer(n)
-            if not a or a=='' then return '____' end
-            return a..(I.overLimit(test.byNumber[n],a) and ' !' or '')
-          end)))
-        end
-        for _,q in ipairs(test.questions) do
-          local n=first(q)
-          if n>=g.from and n<=g.to then
-            if q.type=='gap' then
-              local a=session:answer(n)
-              buttons{{text=('%d  %s'):format(n,(a and a~='') and a or '____'),callback=function()
-                local off=widget._scroll and widget._scroll:getScrolledOffset()
-                UI:close(widget);o.on_pick(n,off)
-              end}}
-            else
-              local sel,row={},{}
-              local list=session:answer(n)
-              if q.type=='multi' then for _,l in ipairs(list or {}) do sel[l]=true end elseif list then sel[list]=true end
-              text(('%s. %s'):format(type(q.n)=='table' and q.n[1]..'-'..q.n[#q.n] or n,q.text or ''))
-              for _,opt in ipairs(q.options or {}) do
-                row[#row+1]={text=opt,selected=sel[opt],callback=function()
-                  if q.type=='multi' then
-                    local l,out,had={}, {},false
-                    for _,x in ipairs(list or {}) do if x==opt then had=true else out[#out+1]=x end end
-                    l=out;if not had and #l<(q.picks or #q.n) then l[#l+1]=opt end
-                    session:setAnswer(n,l)
-                  else session:setAnswer(n,opt) end
-                  redraw()
-                end}
-              end
-              choices(row)
-            end
-          end
-        end
-        gap()
-      end
+    -- Gaps written as {n} inside a group's text are shown there; their rows stay short.
+    local inline={}
+    for _,g in ipairs(test.groups or {}) do for n in (g.text or ''):gmatch('{(%d+)}') do inline[tonumber(n)]=true end end
+    local function shown(n,a)
+      if not a or a=='' then return '____' end
+      return a..(I.overLimit(test.byNumber[n],a) and ' !' or '')
     end
-    buttons{{text='Finish',callback=function() session:pause(now());session:finish();redraw{results=true,offset=false} end}}
+    local function question(q)
+      local n=first(q)
+      if q.type=='gap' then
+        if q.text then text(q.text) end
+        local label=shown(n,session:answer(n))
+        if not inline[n] then label=((q.before or '')..' '..label..' '..(q.after or '')):match('^%s*(.-)%s*$') end
+        buttons{{text=('%d  %s'):format(n,label),callback=function()
+          local off=widget._scroll and widget._scroll:getScrolledOffset()
+          UI:close(widget);o.on_pick(n,off)
+        end}}
+        return
+      end
+      local sel,row={},{}
+      local list=session:answer(n)
+      if q.type=='multi' then for _,l in ipairs(list or {}) do sel[l]=true end elseif list then sel[list]=true end
+      text(('%s. %s'):format(type(q.n)=='table' and q.n[1]..'-'..q.n[#q.n] or n,q.text or ''))
+      for _,opt in ipairs(q.options or {}) do
+        row[#row+1]={text=opt,selected=sel[opt],callback=function()
+          if q.type=='multi' then
+            local l,had={},false
+            for _,x in ipairs(list or {}) do if x==opt then had=true else l[#l+1]=x end end
+            if not had and #l<(q.picks or #q.n) then l[#l+1]=opt end
+            session:setAnswer(n,l)
+          else session:setAnswer(n,opt) end
+          redraw()
+        end}
+      end
+      choices(row)
+    end
+    -- Questions in number order; a group's header comes before its first question. Ungrouped ones show too.
+    local qs={}
+    for _,q in ipairs(test.questions) do
+      local n=first(q)
+      if not P or n>=P.from and n<=P.to then qs[#qs+1]=q end
+    end
+    table.sort(qs,function(a,b) return first(a)<first(b) end)
+    local current
+    for _,q in ipairs(qs) do
+      local n,g=first(q),nil
+      for _,x in ipairs(test.groups or {}) do if n>=x.from and n<=x.to then g=x;break end end
+      if g~=current then
+        if current~=nil or g==nil then gap() end
+        current=g
+        if g then
+          if g.title then text(g.title,22,'tfont') end
+          if g.instructions then text(g.instructions) end
+          for _,l in ipairs(g.list or {}) do text(l) end
+          if g.text then text((g.text:gsub('{(%d+)}',function(x) x=tonumber(x);return shown(x,session:answer(x)) end))) end
+        end
+      end
+      question(q)
+    end
+    gap()
+    buttons{{text='Finish',callback=function() session:pause(now());session:finish();redraw{results=true,offset=false,refresh='full'} end}}
   end
   local scroll=Scroll:new{dimen=Geom:new{w=w,h=h},show_parent=widget,FrameContainer:new{padding=pad,bordersize=0,col}}
   widget._scroll=scroll;widget.cropping_widget=scroll
   if o.offset then scroll:setScrolledOffset(o.offset) end
   widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,scroll}
   widget._col=col
-  UI:show(widget,'full')
+  UI:show(widget,o.refresh or 'full')
   return widget
 end
 return M

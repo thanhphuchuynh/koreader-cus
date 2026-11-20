@@ -252,14 +252,16 @@ function Preview:showQuestions(n,offset)
     local st=self._ielts
     if not st then return end
     local I=require('english_ielts')
-    local p=n and I.passageOf(st.test,n)
-    local passage=p and p.n or self:ieltsChapter()
+    local ok,p=pcall(function() return n and I.passageOf(st.test,n) end)
+    local passage=ok and p and p.n or self:ieltsChapter()
     logger.info('Leaf: ielts panel passage',passage)
-    require('english_ielts_panel').show{test=st.test,session=st.session,passage=passage,offset=offset,
+    -- Footer tap, English tools and returns from pick/evidence all land here: a bad test file must not crash the reader.
+    local ok,e=pcall(require('english_ielts_panel').show,{test=st.test,session=st.session,passage=passage,offset=offset,
         results=st.session:finished(),now=os.time,
         on_pick=function(q,off) self:ieltsPick(q,off) end,
         on_passage=function() self:ieltsFooterRefresh() end,
-        on_evidence=function(q) self:showEvidence(q) end}
+        on_evidence=function(q) self:showEvidence(q) end})
+    if not ok then logger.info('Leaf: ielts error',e) end
 end
 
 function Preview:ieltsPick(n,offset)
@@ -279,10 +281,10 @@ function Preview:ieltsPickDone()
     self:showQuestions(n,st.offset)
 end
 
--- Bare word: no edge punctuation or quotes; ’ becomes '.
+-- Bare word: quotes folded (’ becomes '), edges trimmed like answer matching (apostrophes kept).
 local function bareWord(s)
-    s=s:gsub('’',"'"):gsub('‘',"'"):gsub('“','"'):gsub('”','"')
-    return (s:gsub('^[%p%s]+',''):gsub('[%p%s]+$',''))
+    local I=require('english_ielts')
+    return I.trim(I.fold(s))
 end
 
 function Preview:ieltsPickWord(text)
@@ -295,44 +297,50 @@ function Preview:ieltsPickWord(text)
     if st.test.byNumber[n].words==1 then self:ieltsPickDone() else self:ieltsBanner() end
 end
 
--- Small non-modal top banner. Taps outside its buttons go on to the reader (word taps, page turns).
+-- One-row non-modal banner over the footer strip (the tap hook ignores that strip, so no passage
+-- word is hidden). Taps outside it go on to the reader (word taps, page turns).
 function Preview:ieltsBanner()
     local st=self._ielts
     local n=st.picking
     if st.banner then UIManager:close(st.banner) end
     local InputContainer=require('ui/widget/container/inputcontainer')
     local FrameContainer=require('ui/widget/container/framecontainer')
-    local VerticalGroup=require('ui/widget/verticalgroup')
-    local TextBoxWidget=require('ui/widget/textboxwidget')
-    local ButtonTable=require('ui/widget/buttontable')
+    local HorizontalGroup=require('ui/widget/horizontalgroup')
+    local TextWidget=require('ui/widget/textwidget')
+    local Button=require('ui/widget/button')
     local Font=require('ui/font')
     local Blitbuffer=require('ffi/blitbuffer')
-    local w,pad=Screen:getWidth(),Screen:scaleBySize(8)
+    local w,h,pad=Screen:getWidth(),Screen:getHeight(),Screen:scaleBySize(2)
     local a=st.session:answer(n)
     local banner=InputContainer:new{name='english_ielts_banner'}
-    banner[1]=FrameContainer:new{padding=pad,bordersize=1,background=Blitbuffer.COLOR_WHITE,
-        VerticalGroup:new{align='left',
-            TextBoxWidget:new{text=('Q%d · %s'):format(n,(a and a~='') and a or 'tap words in the passage'),
-                face=Font:getFace('cfont',18),width=w-2*pad-2},
-            ButtonTable:new{width=w-2*pad-2,buttons={{
-                {text='Done',callback=function() self:ieltsPickDone() end},
-                {text='Clear',callback=function() st.session:setAnswer(n,'');self:ieltsBanner() end},
-                {text='Type instead',callback=function() self:ieltsType() end},
-            }}},
-        }}
+    local row=HorizontalGroup:new{align='center'}
+    local used=0
+    for _,b in ipairs({
+        {text='Done',callback=function() self:ieltsPickDone() end},
+        {text='Clear',callback=function() st.session:setAnswer(n,'');self:ieltsBanner() end},
+        {text='Type instead',callback=function() self:ieltsType() end},
+    }) do
+        local button=Button:new{text=b.text,callback=b.callback,text_font_size=16,padding_v=pad,show_parent=banner}
+        row[#row+1]=button;used=used+(button.getSize and button:getSize().w or 0)
+    end
+    table.insert(row,1,TextWidget:new{text=('Q%d · %s'):format(n,(a and a~='') and a or 'tap words in the passage'),
+        face=Font:getFace('cfont',16),max_width=math.max(w-used-4*pad-2,w/4)})
+    banner[1]=FrameContainer:new{padding=pad,bordersize=1,background=Blitbuffer.COLOR_WHITE,width=w,row}
+    local size=banner[1].getSize and banner[1]:getSize()
     local handle=banner.handleEvent
     banner.handleEvent=function(b,event)
         if handle(b,event) then return true end
         -- Input only: broadcasts already reach the reader directly, forwarding them would double them.
         if event.handler~='onGesture' and event.handler~='onKeyPress' and event.handler~='onKeyRepeat' then return end
         local ges=event.handler=='onGesture' and event.args and event.args[1]
-        if b.dimen and ges and ges.pos and ges.pos:intersectWith(b.dimen) then return true end -- the banner itself
+        -- The banner's whole strip (also beside its row) is its own: a footer tap there would open the panel mid-pick.
+        if b.dimen and ges and ges.pos and ges.pos.y>=b.dimen.y then return true end
         local ok,res=pcall(self.ui.handleEvent,self.ui,event)
         if not ok then logger.info('Leaf: ielts error',res) end
         return ok and res
     end
     st.banner=banner
-    UIManager:show(banner,'ui')
+    UIManager:show(banner,'ui',nil,0,h-(size and size.h or 0))
 end
 
 function Preview:ieltsType()
@@ -534,9 +542,10 @@ function Preview:idiomFor(highlight)
         logger.info('Leaf: idiom', found and found.headword or 'none')
         if not found then return nil end
         pcall(function() -- no gloss is fine; the idiom still shows
-            local started = os.time()
+            local time = require('ui/time')
+            local started = time.now()
             local results = self.ui.dictionary:startSdcv(found.headword, nil, false)
-            logger.info('Leaf: idiom gloss lookup', os.time()-started, 's')
+            logger.info('Leaf: idiom gloss lookup', time.to_ms(time.now()-started), 'ms')
             local first = results and results[1]
             if first and not first.no_result and first.definition then
                 -- startSdcv results don't carry is_html yet (set later by ReaderDictionary): sniff tags.

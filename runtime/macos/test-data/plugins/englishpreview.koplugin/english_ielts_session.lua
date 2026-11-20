@@ -36,10 +36,10 @@ function M:pause(now)
   self.rec.elapsed=self.rec.elapsed+now-self.startedAt;self.startedAt=nil;self:save()
 end
 
+function M:elapsed(now) return self.rec.elapsed+(self.startedAt and now-self.startedAt or 0) end
 function M:remaining(now)
   if self.rec.mode~='practice' then return nil end
-  local e=self.rec.elapsed+(self.startedAt and now-self.startedAt or 0)
-  return math.max(0,self.test.minutes*60-e)
+  return math.max(0,self.test.minutes*60-self:elapsed(now))
 end
 
 function M:footer(now)

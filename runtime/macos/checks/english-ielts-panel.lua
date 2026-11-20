@@ -3,7 +3,8 @@ local J=require('json')
 local I=require('english_ielts')
 local f=assert(io.open(arg[1]..'/../../../../ielts-sample.json'));local raw=f:read('*a');f:close()
 local shown={}
-local UI={show=function(_,w) shown[#shown+1]=w end,close=function() end}
+local modes={}
+local UI={show=function(_,w,mode) shown[#shown+1]=w;modes[#modes+1]=mode end,close=function() end}
 local Widget={}
 function Widget:new(t) return t or {} end
 local Scroll={}
@@ -44,6 +45,7 @@ assert(button('TRUE') and not selected('TRUE'))
 shown[#shown]._scroll.off={x=0,y=250}
 button('TRUE')()
 assert(session:answer(1)=='TRUE' and selected('TRUE'),'selected must be preselected (inverted)')
+assert(modes[1]=='full' and modes[#modes]=='ui','first open full refresh, in-panel taps ui')
 assert(shown[#shown]._scroll.off.y==250 and shown[#shown].cropping_widget==shown[#shown]._scroll,'scroll kept, cropping_widget set')
 button('B')();button('A')();button('C')()
 assert(#session:answer(3)==2 and session:answer(3)[1]=='B','multi capped at picks')
@@ -66,5 +68,32 @@ P.show(opts);session:setAnswer(1,'TRUE');button('Finish')()
 assert(has('/6') and has('Band ≈') and has('Time used 00:00') and has('✓ 1. TRUE'))
 closedW=nil;button('Show in passage')();assert(evidence==test.byNumber[1] and closedW==shown[#shown],'evidence closes panel')
 button('Try again')();assert(session:answered()==0 and button('Finish') and session.startedAt~=nil,'Try again restarts the clock')
+assert(modes[#modes]=='ui','Try again redraw is ui')
 button('Finish')();button('Done')();assert(done)
+session:reset();P.show(opts);button('Finish')();assert(modes[#modes]=='full','entering results is a full refresh')
+-- Time used counts real elapsed time, past the limit.
+local s3=S.new(test,store());s3:setMode('practice');s3:start(0)
+P.show({test=test,session=s3,now=function() return 1300 end,on_pick=function()end,on_evidence=function()end,on_passage=function()end})
+button('Finish')();assert(has('Time used 21:40'),'time used not capped')
+-- Gap prompt: text above, before ____ after on the row; answer replaces the blank, flagged when over the limit.
+local g3={version=1,minutes=20,passages={{n=1,from=1,to=4}},groups={{from=3,to=3,title='G3',instructions='i'}},
+  questions={{n=1,type='gap',words=1,text='Table: elephants',before='counts of elephant',after='at night',answer='footprints'},
+    {n=2,type='choice',options={'X','Y'},answer='X',text='ungrouped choice'},
+    {n=3,type='choice',options={'A','B'},answer='A',text='grouped'},{n=4,type='gap',words=1,before='tail',answer='end'}}}
+local t3=assert(I.parse(J.encode(g3)));local s4=S.new(t3,store())
+local o3={test=t3,session=s4,on_pick=function()end,on_evidence=function()end,on_passage=function()end}
+P.show(o3)
+assert(has('Table: elephants') and button('1  counts of elephant ____ at night') and button('4  tail ____'),'gap row shows its prompt')
+assert(has('ungrouped choice') and button('X') and has('G3'),'ungrouped questions are drawn')
+s4:setAnswer(1,'two words');P.show(o3);assert(button('1  counts of elephant two words ! at night'))
+-- No groups at all: every question still shows.
+local g4={version=1,minutes=20,passages={{n=1,from=1,to=2}},questions={{n=1,type='choice',options={'P','Q'},answer='P',text='first'},{n=2,type='gap',words=1,answer='z'}}}
+local t4=assert(I.parse(J.encode(g4)))
+P.show({test=t4,session=S.new(t4,store()),on_pick=function()end,on_evidence=function()end,on_passage=function()end})
+assert(has('first') and button('P') and button('2  ____'),'test without groups shows its questions')
+-- Numbering need not start at 1 (a single Part 2 file).
+local g5={version=1,minutes=20,passages={{n=1,from=14,to=14}},questions={{n=14,type='choice',options={'A'},answer='A',text='later'}}}
+local t5=assert(I.parse(J.encode(g5)))
+P.show({test=t5,session=S.new(t5,store()),on_pick=function()end,on_evidence=function()end,on_passage=function()end})
+assert(has('later'))
 print('PASS: ielts panel, selection, multi cap, blanks, passage switch, results')

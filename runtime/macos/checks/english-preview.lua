@@ -224,7 +224,10 @@ instance.ui.document={
 local looked
 -- Real sdcv results arrive as HTML without is_html set (ReaderDictionary sets it later).
 instance.ui.dictionary.startSdcv=function(_,word)looked=word;return {{dict='en-en',definition='<div><i>v.</i> <span>1.</span> <b>quit</b> <span>— give up in the face of defeat</span></div>'}}end
+local timed=0;package.loaded['ui/time']={now=function() timed=timed+1;return 0 end,to_ms=function(t) return t end}
 instance:showSmallPopup('gave',{results={{dict='en-en',definition='past of give',word='gave'}}})
+package.loaded['ui/time']=nil
+assert(timed>=2,'gloss lookup is timed with ui/time (ms), not os.time')
 local popup=shown[#shown]
 assert(looked=='give up','the idiom meaning comes from the dictionary headword')
 local function has(root,needle)

@@ -7,22 +7,22 @@ local KEY=J.encode(d)
 local clock=1000;os.time=function() return clock end
 trace=nil
 local shown,closed,scheduled,unscheduled,dirty={},{},{},0,0
-local UI={show=function(_,w) shown[#shown+1]=w end,close=function(_,w) closed[#closed+1]=w end,
+local UI={show=function(_,w,mode,region,x,y) shown[#shown+1]=w;w._at={x=x,y=y} end,close=function(_,w) closed[#closed+1]=w end,
   scheduleIn=function(_,s,fn) scheduled[#scheduled+1]={s,fn} end,unschedule=function() unscheduled=unscheduled+1 end,
   setDirty=function(_,w,mode) dirty=dirty+1;if trace then trace[#trace+1]='dirty:'..tostring(w)..':'..tostring(mode) end end}
-local Widget={};function Widget:new(t) t=t or {};t.handleEvent=t.handleEvent or function() end;return t end
+local Widget={};function Widget:new(t) t=t or {};t.handleEvent=t.handleEvent or function() end;t.getSize=function() return {w=100,h=40} end;return t end
 package.preload['ui/widget/container/widgetcontainer']=function() return {extend=function(_,t) return t end} end
 package.preload['ui/uimanager']=function() return UI end
 package.preload['ui/widget/textviewer']=function() return Widget end
 package.preload['ui/widget/dictquicklookup']=function() return {buildButtonLayout=function() return {} end} end
 package.preload['device']=function() return {screen={getWidth=function() return 600 end,getHeight=function() return 800 end,scaleBySize=function(_,s) return s end}} end
-for _,n in ipairs({'container/inputcontainer','container/framecontainer','verticalgroup','textboxwidget','buttontable','infomessage','inputdialog'}) do
+for _,n in ipairs({'container/inputcontainer','container/framecontainer','verticalgroup','textboxwidget','buttontable','infomessage','inputdialog','horizontalgroup','textwidget','button'}) do
   package.preload['ui/widget/'..n]=function() return Widget end
 end
 package.preload['ui/font']=function() return {getFace=function() return {} end} end
 package.preload['ffi/blitbuffer']=function() return {COLOR_WHITE=255} end
-local panels,popups={},{}
-package.preload['english_ielts_panel']=function() return {show=function(o) panels[#panels+1]=o;return {panel=true} end} end
+local panels,popups,panelBoom={},{},false
+package.preload['english_ielts_panel']=function() return {show=function(o) if panelBoom then error('bad test') end;panels[#panels+1]=o;return {panel=true} end} end
 package.preload['english_popup']=function() return {show=function(o) popups[#popups+1]=o;return {} end} end
 local Preview=assert(loadfile(arg[1]..'/main.lua'))()
 
@@ -113,10 +113,14 @@ clock=clock+65
 assert(r.added[1]()=='Q 0/6 · 18:55')
 -- Footer tap opens the panel at the current chapter.
 assert(r.footer:TapFooter()==true and r.footerTaps==0 and panels[#panels].passage==1,'footer tap opens panel')
+panelBoom=true;assert(r.footer:TapFooter()==true,'a panel error from the footer tap is contained')
+r.plugin:showQuestions();panelBoom=false
 -- One-word gap: tap "amber," fills Q5, no dictionary, panel reopened.
 local n0=#panels
 panels[#panels].on_pick(5,{x=0,y=120})
 assert(st.picking==5 and walk(shown[#shown],function(t) return t.text=='Q5 · tap words in the passage' end),'banner shown')
+assert(shown[#shown]==st.banner and st.banner._at.y==800-40 and st.banner._at.y>=800*0.94,'banner sits on the footer strip, not over passage text')
+assert(walk(st.banner,function(t) return t.text=='Type instead' end) and not walk(st.banner,function(t) return t.buttons end),'banner is one row, no button table')
 assert(r.tap('amber,')==true and st.session:answer(5)=='amber','one-word pick')
 assert(r.tapped==nil and r.clears>=1,'pick must not open the dictionary and must clear the selection')
 assert(st.picking==nil and #panels==n0+1 and panels[#panels].offset.y==120,'one-word gap returns to the panel at the same scroll')
@@ -129,7 +133,7 @@ local function bannerButton(l) return walk(shown[#shown],function(t) return t.te
 bannerButton('Clear')()
 assert(st.session:answer(6)=='' and st.picking==6)
 r.tap('sensors’');r.tap('don’t.')
-assert(st.session:answer(6)=="sensors don't",'bare word: curly apostrophe kept inside, edges stripped')
+assert(st.session:answer(6)=="sensors' don't",'bare word: apostrophes kept like answer matching, other edges stripped')
 local n1=#panels
 bannerButton('Done')()
 assert(st.picking==nil and #panels==n1+1 and r.tapped==nil,'Done returns to panel')
@@ -142,8 +146,8 @@ st.picking=nil
 -- Banner: input outside it goes to the reader; its own area, broadcasts and reader errors stay put.
 panels[#panels].on_pick(6)
 local b=st.banner
-local function pos(inside) return {intersectWith=function() return inside end} end
-b.dimen={}
+local function pos(inside) return {x=590,y=inside and 790 or 100} end
+b.dimen={x=0,y=760,w=300,h=40}
 assert(b:handleEvent({handler='onGesture',args={{pos=pos(false)}}})==true and #r.events==1,'tap outside forwarded')
 assert(b:handleEvent({handler='onGesture',args={{pos=pos(true)}}})==true and #r.events==1,'tap on banner kept')
 assert(b:handleEvent({handler='onKeyPress',args={}})==true and #r.events==2,'key page turn forwarded')
