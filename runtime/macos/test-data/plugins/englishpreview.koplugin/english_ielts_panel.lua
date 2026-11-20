@@ -70,7 +70,7 @@ function M.show(o)
     for _,row in ipairs(r.rows) do
       local ans=row.answer~='' and row.answer or '—'
       text(row.ok and ('✓ %d. %s'):format(row.n,ans) or ('✗ %d. %s → %s'):format(row.n,ans,row.correct))
-      buttons{{text='Show in passage',callback=function() o.on_evidence(test.byNumber[row.n]) end}}
+      buttons{{text='Show in passage',callback=function() UI:close(widget);o.on_evidence(test.byNumber[row.n]) end}}
     end
     gap()
     buttons{{text='Try again',callback=function() session:reset();redraw{results=false,offset=false} end},
@@ -104,7 +104,10 @@ function M.show(o)
           if n>=g.from and n<=g.to then
             if q.type=='gap' then
               local a=session:answer(n)
-              buttons{{text=('%d  %s'):format(n,(a and a~='') and a or '____'),callback=function() o.on_pick(n) end}}
+              buttons{{text=('%d  %s'):format(n,(a and a~='') and a or '____'),callback=function()
+                local off=widget._scroll and widget._scroll:getScrolledOffset()
+                UI:close(widget);o.on_pick(n,off)
+              end}}
             else
               local sel,row={},{}
               local list=session:answer(n)

@@ -32,9 +32,9 @@ local function has(sub) return walk(shown[#shown],function(t) return type(t.text
 local d=J.decode(raw);for _,p in ipairs(d.passages) do p.paragraphs=nil end
 local test=assert(I.parse(J.encode(d)))
 local session=S.new(test,store());session:setMode('practice')
-local picked,evidence,done
+local picked,pickedOff,evidence,done
 local opts={test=test,session=session,passage=1,now=function() return 0 end,
-  on_pick=function(n) picked=n end,on_evidence=function(q) evidence=q end,on_passage=function() done=true end}
+  on_pick=function(n,off) picked=n;pickedOff=off end,on_evidence=function(q) evidence=q end,on_passage=function() done=true end}
 P.show(opts)
 local dots=walk(shown[#shown],function(t) return type(t.text)=='string' and t.text:find('□',1,true) end)
 local _,a=dots.text:gsub('■','');local _,b=dots.text:gsub('□','');local count=a+b;assert(count==test.total,'dots='..count)
@@ -48,7 +48,9 @@ assert(shown[#shown]._scroll.off.y==250 and shown[#shown].cropping_widget==shown
 button('B')();button('A')();button('C')()
 assert(#session:answer(3)==2 and session:answer(3)[1]=='B','multi capped at picks')
 button('B')();assert(#session:answer(3)==1)
-button('6  ____')() ;assert(picked==6)
+local closedW;UI.close=function(_,w) closedW=w end
+local before=shown[#shown];before._scroll.off={x=0,y=40}
+button('6  ____')() ;assert(picked==6 and pickedOff.y==40 and closedW==before,'gap tap closes panel, passes scroll')
 button('← Passage')();assert(done)
 session:setAnswer(5,'ember');session:setAnswer(6,'three big words');P.show(opts)
 assert(has('ember') and has('three big words !'))
@@ -62,7 +64,7 @@ button('Passage 2')();assert(has('G2') and not has('G1'))
 -- results
 P.show(opts);session:setAnswer(1,'TRUE');button('Finish')()
 assert(has('/6') and has('Band ≈') and has('Time used 00:00') and has('✓ 1. TRUE'))
-button('Show in passage')();assert(evidence==test.byNumber[1])
+closedW=nil;button('Show in passage')();assert(evidence==test.byNumber[1] and closedW==shown[#shown],'evidence closes panel')
 button('Try again')();assert(session:answered()==0 and button('Finish'))
 button('Finish')();button('Done')();assert(done)
 print('PASS: ielts panel, selection, multi cap, blanks, passage switch, results')

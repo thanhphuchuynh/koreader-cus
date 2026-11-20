@@ -152,10 +152,248 @@ end
 
 function Preview:onCloseDocument()
     if self._speech then self._speech:stop() end
+    self:closeIelts()
 end
 
 function Preview:onSuspend()
     if self._speech then self._speech:stop() end
+    if self._ielts then self._ielts.session:pause(os.time()) end
+end
+
+function Preview:onResume()
+    if self._ielts then self._ielts.session:start(os.time()) end
+end
+
+-- IELTS Reading: a test EPUB carries META-INF/leaf-ielts.json. Any failure leaves the book as a normal book.
+function Preview:loadIelts()
+    if not self.ui.rolling or not self.ui.document or not self.ui.document.getDocumentFileContent then return end
+    local ok,err=pcall(function()
+        local raw=self.ui.document:getDocumentFileContent('META-INF/leaf-ielts.json')
+        if not raw then return end
+        local test,why=require('english_ielts').parse(raw)
+        if not test then logger.info('Leaf: ielts not a test',why);return end
+        local session=require('english_ielts_session').new(test,self.ui.doc_settings)
+        local st={test=test,session=session}
+        st.footer=function() return session:footer(os.time()) end
+        st.tick=function() self:ieltsTick() end
+        self._ielts=st
+        local footer=self.ui.view and self.ui.view.footer
+        if footer then
+            footer:addAdditionalFooterContent(st.footer);st.footer_added=footer
+            if not footer._leaf_ielts_tap then
+                footer._leaf_ielts_tap=true
+                local original=footer.TapFooter
+                footer.TapFooter=function(f,...)
+                    if self._ielts then self:showQuestions();return true end
+                    return original(f,...)
+                end
+            end
+        end
+        session:start(os.time())
+        UIManager:scheduleIn(60,st.tick)
+        logger.info('Leaf: ielts test',test.total,'questions, mode',session:mode() or 'unset')
+        if not session:mode() then self:askIeltsMode() end
+    end)
+    if not ok then logger.info('Leaf: ielts error',err);self:closeIelts() end
+end
+
+function Preview:closeIelts()
+    local st=self._ielts
+    if not st then return end
+    self._ielts=nil
+    pcall(function()
+        st.session:pause(os.time())
+        UIManager:unschedule(st.tick)
+        if st.footer_added then st.footer_added:removeAdditionalFooterContent(st.footer) end
+        if st.banner then UIManager:close(st.banner) end
+    end)
+end
+
+function Preview:ieltsFooterRefresh()
+    local footer=self.ui.view and self.ui.view.footer
+    if footer and footer.maybeUpdateFooter then pcall(footer.maybeUpdateFooter,footer) end
+end
+
+function Preview:askIeltsMode()
+    local session=self._ielts.session
+    local function pick(mode,close)
+        session:setMode(mode);close();self:ieltsFooterRefresh()
+    end
+    require('english_popup').show{title='IELTS Reading',
+        text='Practice: timed, like the real test.\nStudy: no timer.\nTap the footer to open the questions.',
+        buttons=function(close) return {{
+            {text='Practice',callback=function() pick('practice',close) end},
+            {text='Study',callback=function() pick('study',close) end},
+        }} end}
+end
+
+-- Once a minute: refresh the countdown, and say once when time is up (answering stays open).
+function Preview:ieltsTick()
+    local st=self._ielts
+    if not st then return end
+    local left=st.session:remaining(os.time())
+    if left then self:ieltsFooterRefresh() end
+    if left==0 and not st.session:timeUpNoticed() then
+        st.session:noteTimeUp()
+        logger.info('Leaf: ielts time up')
+        UIManager:show(require('ui/widget/infomessage'):new{text='Time is up — you can keep answering.'})
+    end
+    UIManager:scheduleIn(60,st.tick)
+end
+
+-- Passage k is spine item k (OEBPS/passage<k>.xhtml), so DocFragment[k] of the current position.
+function Preview:ieltsChapter()
+    local ok,xp=pcall(self.ui.document.getXPointer,self.ui.document)
+    local k=ok and tonumber(tostring(xp):match('DocFragment%[(%d+)%]')) or 1
+    return math.max(1,math.min(k,#(self._ielts.test.passages or {})))
+end
+
+function Preview:showQuestions(n,offset)
+    local st=self._ielts
+    if not st then return end
+    local I=require('english_ielts')
+    local p=n and I.passageOf(st.test,n)
+    local passage=p and p.n or self:ieltsChapter()
+    logger.info('Leaf: ielts panel passage',passage)
+    require('english_ielts_panel').show{test=st.test,session=st.session,passage=passage,offset=offset,
+        results=st.session.rec.finished,now=os.time,
+        on_pick=function(q,off) self:ieltsPick(q,off) end,
+        on_passage=function() self:ieltsFooterRefresh() end,
+        on_evidence=function(q) self:showEvidence(q) end}
+end
+
+function Preview:ieltsPick(n,offset)
+    local st=self._ielts
+    st.picking,st.offset=n,offset
+    logger.info('Leaf: ielts pick start',n)
+    self:ieltsBanner()
+end
+
+function Preview:ieltsPickDone()
+    local st=self._ielts
+    local n=st.picking
+    st.picking=nil
+    if st.banner then UIManager:close(st.banner);st.banner=nil end
+    logger.info('Leaf: ielts pick done',n,st.session:answer(n))
+    self:ieltsFooterRefresh()
+    self:showQuestions(n,st.offset)
+end
+
+-- Bare word: no edge punctuation or quotes; ’ becomes '.
+local function bareWord(s)
+    s=s:gsub('’',"'"):gsub('‘',"'"):gsub('“','"'):gsub('”','"')
+    return (s:gsub('^[%p%s]+',''):gsub('[%p%s]+$',''))
+end
+
+function Preview:ieltsPickWord(text)
+    local st=self._ielts
+    local n,word=st.picking,bareWord(text)
+    if word=='' then return end
+    local a=st.session:answer(n)
+    st.session:setAnswer(n,(a and a~='') and a..' '..word or word)
+    logger.info('Leaf: ielts picked',n,word)
+    if st.test.byNumber[n].words==1 then self:ieltsPickDone() else self:ieltsBanner() end
+end
+
+-- Small non-modal top banner. Taps outside its buttons go on to the reader (word taps, page turns).
+function Preview:ieltsBanner()
+    local st=self._ielts
+    local n=st.picking
+    if st.banner then UIManager:close(st.banner) end
+    local InputContainer=require('ui/widget/container/inputcontainer')
+    local FrameContainer=require('ui/widget/container/framecontainer')
+    local VerticalGroup=require('ui/widget/verticalgroup')
+    local TextBoxWidget=require('ui/widget/textboxwidget')
+    local ButtonTable=require('ui/widget/buttontable')
+    local Font=require('ui/font')
+    local Blitbuffer=require('ffi/blitbuffer')
+    local w,pad=Screen:getWidth(),Screen:scaleBySize(8)
+    local a=st.session:answer(n)
+    local banner=InputContainer:new{name='english_ielts_banner'}
+    banner[1]=FrameContainer:new{padding=pad,bordersize=1,background=Blitbuffer.COLOR_WHITE,
+        VerticalGroup:new{align='left',
+            TextBoxWidget:new{text=('Q%d · %s'):format(n,(a and a~='') and a or 'tap words in the passage'),
+                face=Font:getFace('cfont',18),width=w-2*pad-2},
+            ButtonTable:new{width=w-2*pad-2,buttons={{
+                {text='Done',callback=function() self:ieltsPickDone() end},
+                {text='Clear',callback=function() st.session:setAnswer(n,'');self:ieltsBanner() end},
+                {text='Type instead',callback=function() self:ieltsType() end},
+            }}},
+        }}
+    local handle=banner.handleEvent
+    banner.handleEvent=function(b,event)
+        if handle(b,event) then return true end
+        if event.handler~='onGesture' then return end
+        local ges=event.args and event.args[1]
+        if b.dimen and ges and ges.pos and ges.pos:intersectWith(b.dimen) then return true end -- the banner itself
+        if self.ui.handleEvent then return self.ui:handleEvent(event) end
+    end
+    st.banner=banner
+    UIManager:show(banner,'ui')
+end
+
+function Preview:ieltsType()
+    local st=self._ielts
+    local n=st.picking
+    local dialog
+    dialog=require('ui/widget/inputdialog'):new{title=('Question %d'):format(n),input=st.session:answer(n) or '',
+        buttons={{
+            {text='Cancel',id='close',callback=function() UIManager:close(dialog) end},
+            {text='Save',is_enter_default=true,callback=function()
+                st.session:setAnswer(n,dialog:getInputText());UIManager:close(dialog);self:ieltsPickDone()
+            end},
+        }}}
+    UIManager:show(dialog)
+    dialog:onShowKeyboard()
+end
+
+-- Jump to a question's evidence inside its passage chapter; crengine keeps the hit highlighted
+-- (as ReaderSearch relies on for EPUB) until the next page turn or tap.
+function Preview:showEvidence(q)
+    local st=self._ielts
+    if not st or not q then return end
+    local I=require('english_ielts')
+    local doc=self.ui.document
+    local n=type(q.n)=='table' and q.n[1] or q.n
+    local p=I.passageOf(st.test,n)
+    local ev=q.evidence or ''
+    -- Straight vs curly quotes: try as-is, folded, then the longest quote/dash-free run of it.
+    local folded,longest=I.fold(ev),''
+    for part in folded:gmatch('[^\'"%-]+') do
+        part=part:match('^%s*(.-)%s*$')
+        if #part>#longest then longest=part end
+    end
+    for _,pattern in ipairs({ev,folded,longest}) do
+        if pattern~='' then
+            local ok,hits=pcall(doc.findText,doc,pattern,-1,1,true,nil,false,100)
+            for _,hit in ipairs(ok and type(hits)=='table' and hits or {}) do
+                local k=tonumber(tostring(hit.start):match('DocFragment%[(%d+)%]'))
+                if not p or k==p.n then
+                    logger.info('Leaf: ielts evidence found',n,pattern)
+                    self.ui.link:onGotoLink({xpointer=hit.start})
+                    st.evidence_page=doc:getCurrentPage()
+                    UIManager:setDirty(self.ui.dialog,'ui')
+                    return true
+                end
+            end
+        end
+    end
+    logger.info('Leaf: ielts evidence not found',n,ev)
+    pcall(doc.clearSelection,doc)
+    UIManager:show(require('ui/widget/infomessage'):new{text='Could not find this in the passage.'})
+    self:showQuestions(n)
+end
+
+function Preview:clearIeltsEvidence()
+    local st=self._ielts
+    if not st or not st.evidence_page then return end
+    st.evidence_page=nil
+    pcall(self.ui.document.clearSelection,self.ui.document)
+    UIManager:setDirty(self.ui.dialog,'ui')
+end
+
+function Preview:onPageUpdate(page)
+    if self._ielts and self._ielts.evidence_page and page~=self._ielts.evidence_page then self:clearIeltsEvidence() end
 end
 
 function Preview:isWordSaved(word)
@@ -393,6 +631,7 @@ function Preview:installTapLookup()
     end
     local originalTap = highlight.onTap
     highlight.onTap = function(owner, arg, ges)
+        self:clearIeltsEvidence()
         local handled = originalTap(owner, arg, ges)
         if handled then return handled end
         -- EPUB text only. Reserve edges/top/footer for ordinary reading controls.
@@ -408,6 +647,12 @@ function Preview:installTapLookup()
         -- Native selection owns word boxes, language support and vocabulary context.
         if owner:onHold(arg,ges) and owner.selected_text then
             owner:_resetHoldTimer(true)
+            if self._ielts and self._ielts.picking then -- filling a gap: the word is the answer, not a lookup
+                local text = owner.selected_text.text
+                owner:clear()
+                self:ieltsPickWord(text)
+                return true
+            end
             logger.info('Leaf: tap lookup', owner.selected_text.text)
             owner:lookupDictWord()
             return true
@@ -493,6 +738,7 @@ function Preview:addToMainMenu(items)
         sub_item_table = {
             review,
             {text='Translation history',callback=function()self:getAI():history()end},
+            {text='Questions',enabled_func=function()return self._ielts~=nil end,callback=function()self:showQuestions()end},
             {text='Test English speech',callback=function()self:showSpeechTest()end},
             {text='Sentence help',enabled=self.ui.highlight and self.ui.highlight.selected_text~=nil or false,
              callback=function()self:showSentence()end},
@@ -516,6 +762,7 @@ function Preview:getPerformance()
 end
 
 function Preview:onReaderReady()
+    self:loadIelts()
     local scene = os.getenv('KINDLE_ENGLISH_PREVIEW')
     if not scene then return end
     UIManager:scheduleIn(0.5, function()
