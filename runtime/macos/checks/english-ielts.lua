@@ -19,4 +19,6 @@ assert(I.overLimit({type='gap',words=1},'two words')==true and I.overLimit({type
 assert(I.band(40,40)==9 and I.band(30,40)==7)
 local b,rough=I.band(9,13);assert(b==6.5 and rough==true)
 local b2,r2=I.band(2,40);assert(b2==2 and r2==false)
+assert(I.fold('a\194\160 b')=='a b' and I.normalize('amber]')=='amber' and I.normalize('_amber')=='amber' and I.normalize('\\x^')=='x')
+assert(I.parse('{"version":1,"questions":[{}]}')==nil and I.parse('{"version":1,"questions":[{"n":1,"type":"gap"}]}')==nil and I.parse('{"version":1,"questions":[{"n":[3,4],"type":"multi"}]}')==nil)
 print('PASS: ielts parse, normalize, gap/choice/multi scoring, per-passage totals, band estimate')

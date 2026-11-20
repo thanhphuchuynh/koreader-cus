@@ -3,11 +3,11 @@ local json=require('json')
 
 -- Same quote/dash/whitespace folding as make-ielts-test.py norm(); byte-level because strings are UTF-8.
 function M.fold(s)
-  for from,to in pairs{['’']="'",['‘']="'",['“']='"',['”']='"',['–']='-',['—']='-'} do s=s:gsub(from,to) end
+  for from,to in pairs{['’']="'",['‘']="'",['“']='"',['”']='"',['–']='-',['—']='-',['\194\160']=' '} do s=s:gsub(from,to) end
   return (s:gsub('%s+',' '))
 end
 -- Edge punctuation is stripped except the apostrophe, so "farmers'" keeps its possessive.
-local EDGE='[%s!-&(-/:-@%[-`{-~]+'
+local EDGE='[%s!-&(-/:-@%[%\\%]%^_`{-~]+'
 function M.normalize(s) return (M.fold(s):lower():gsub('^'..EDGE,''):gsub(EDGE..'$','')) end
 
 local function numbers(q) return type(q.n)=='table' and q.n or {q.n} end
@@ -19,6 +19,9 @@ function M.parse(text)
   if type(t.questions)~='table' or #t.questions==0 then return nil,'no questions' end
   t.byNumber,t.total={},0
   for _,q in ipairs(t.questions) do
+    local n=q.n
+    if not (type(n)=='number' or type(n)=='table' and #n>0) then return nil,'question without n' end
+    if (q.type=='choice' or q.type=='gap') and q.answer==nil or q.type=='multi' and type(q.answers)~='table' then return nil,'question without answer' end
     for _,n in ipairs(numbers(q)) do t.byNumber[n]=q;t.total=t.total+1 end
   end
   return t
