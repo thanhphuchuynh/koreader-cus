@@ -23,4 +23,9 @@ for name,arg in cases:
   print(name+': '+('PASS' if result.returncode==0 else 'FAIL'))
   print('\n'.join(line for line in result.stdout.splitlines() if line.startswith('PASS:')))
   if result.returncode:failed=True;print(result.stderr)
+for check in sorted(checks.glob('*.py')):
+ if check.name==Path(__file__).name:continue
+ result=subprocess.run([sys.executable,'-I',str(check)],text=True,capture_output=True)
+ print(check.name+': '+('PASS' if result.returncode==0 else 'FAIL'))
+ if result.returncode:failed=True;print(result.stdout+result.stderr)
 raise SystemExit(int(failed))

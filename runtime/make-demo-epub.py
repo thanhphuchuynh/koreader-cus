@@ -7,8 +7,6 @@ Usage: python3 runtime/make-demo-epub.py
 from pathlib import Path
 import zipfile
 
-out = Path(__file__).resolve().parents[1]/'demo/leaf-demo.epub'
-
 chapters = [
  ('Chapter 1 · The Letter', [
   'Nora had never been good at waiting. When the letter finally arrived, she tore it open before she even took off her coat.',
@@ -45,16 +43,18 @@ def page(title, paragraphs):
 {body}
 </body></html>'''
 
-files = {f'OEBPS/ch{i+1}.xhtml': page(t, ps) for i, (t, ps) in enumerate(chapters)}
-items = '\n'.join(f'<item id="ch{i+1}" href="ch{i+1}.xhtml" media-type="application/xhtml+xml"/>' for i in range(len(chapters)))
-spine = '\n'.join(f'<itemref idref="ch{i+1}"/>' for i in range(len(chapters)))
-nav_points = '\n'.join(f'<navPoint id="n{i+1}" playOrder="{i+1}"><navLabel><text>{t}</text></navLabel><content src="ch{i+1}.xhtml"/></navPoint>'
-                       for i, (t, _) in enumerate(chapters))
-files['OEBPS/content.opf'] = f'''<?xml version="1.0" encoding="utf-8"?>
+def write_epub(out, title, identifier, chapters, stem='ch', extra=None, doc_title=None):
+    """Write an EPUB: chapters = [(title, [paragraph html])]; extra = {zip path: text}."""
+    files = {f'OEBPS/{stem}{i+1}.xhtml': page(t, ps) for i, (t, ps) in enumerate(chapters)}
+    items = '\n'.join(f'<item id="{stem}{i+1}" href="{stem}{i+1}.xhtml" media-type="application/xhtml+xml"/>' for i in range(len(chapters)))
+    spine = '\n'.join(f'<itemref idref="{stem}{i+1}"/>' for i in range(len(chapters)))
+    nav_points = '\n'.join(f'<navPoint id="n{i+1}" playOrder="{i+1}"><navLabel><text>{t}</text></navLabel><content src="{stem}{i+1}.xhtml"/></navPoint>'
+                           for i, (t, _) in enumerate(chapters))
+    files['OEBPS/content.opf'] = f'''<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="id">
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-<dc:title>A Week by the Sea (Leaf demo)</dc:title><dc:creator>Leaf</dc:creator>
-<dc:language>en</dc:language><dc:identifier id="id">leaf-demo-1</dc:identifier>
+<dc:title>{title}</dc:title><dc:creator>Leaf</dc:creator>
+<dc:language>en</dc:language><dc:identifier id="id">{identifier}</dc:identifier>
 </metadata>
 <manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
 {items}
@@ -63,22 +63,26 @@ files['OEBPS/content.opf'] = f'''<?xml version="1.0" encoding="utf-8"?>
 {spine}
 </spine>
 </package>'''
-files['OEBPS/toc.ncx'] = f'''<?xml version="1.0" encoding="utf-8"?>
+    files['OEBPS/toc.ncx'] = f'''<?xml version="1.0" encoding="utf-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
-<head><meta name="dtb:uid" content="leaf-demo-1"/></head>
-<docTitle><text>A Week by the Sea</text></docTitle>
+<head><meta name="dtb:uid" content="{identifier}"/></head>
+<docTitle><text>{doc_title or title}</text></docTitle>
 <navMap>
 {nav_points}
 </navMap>
 </ncx>'''
-files['META-INF/container.xml'] = '''<?xml version="1.0"?>
+    files['META-INF/container.xml'] = '''<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
 <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
 </container>'''
+    files.update(extra or {})
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(out, 'w') as z:
+        z.writestr(zipfile.ZipInfo('mimetype'), 'application/epub+zip')  # first and stored, per EPUB spec
+        for name, text in files.items():
+            z.writestr(name, text, compress_type=zipfile.ZIP_DEFLATED)
 
-out.parent.mkdir(exist_ok=True)
-with zipfile.ZipFile(out, 'w') as z:
-    z.writestr(zipfile.ZipInfo('mimetype'), 'application/epub+zip')  # first and stored, per EPUB spec
-    for name, text in files.items():
-        z.writestr(name, text, compress_type=zipfile.ZIP_DEFLATED)
-print(out)
+if __name__ == '__main__':
+    out = Path(__file__).resolve().parents[1]/'demo/leaf-demo.epub'
+    write_epub(out, 'A Week by the Sea (Leaf demo)', 'leaf-demo-1', chapters, doc_title='A Week by the Sea')
+    print(out)

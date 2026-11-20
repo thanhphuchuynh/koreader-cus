@@ -1,0 +1,111 @@
+{
+ "version": 1,
+ "title": "Night lights and sea turtles",
+ "minutes": 20,
+ "passages": [
+  {
+   "n": 1,
+   "title": "Night lights and sea turtles",
+   "from": 1,
+   "to": 6,
+   "paragraphs": [
+    "Every summer, female loggerhead turtles return to the beaches where they hatched to lay their eggs. Weeks later, the hatchlings dig their way out of the sand at night and head for the sea, guided by the brightest horizon.",
+    "On natural coasts that horizon is the ocean, which reflects moonlight. On developed coasts, however, street lamps and hotels shine more brightly than the water, and many hatchlings crawl inland instead. Researchers in Florida estimate that lighting disorients tens of thousands of hatchlings every year.",
+    "The solution is surprisingly simple. In 2015, the town of Boca Grande replaced its white lamps with amber ones, which turtles barely notice, and asked residents to close their curtains after dark. Within three seasons, disorientation reports fell by more than half.",
+    "Not everyone welcomed the change. Some business owners complained that the dimmer streets felt unsafe, and the town had to add motion sensors near restaurants. Volunteers now patrol the beach at dawn, counting tracks to check whether the hatchlings reached the water."
+   ]
+  }
+ ],
+ "groups": [
+  {
+   "from": 1,
+   "to": 2,
+   "title": "Questions 1-2",
+   "instructions": "Do the following statements agree with the information in the passage? Choose TRUE, FALSE or NOT GIVEN."
+  },
+  {
+   "from": 3,
+   "to": 4,
+   "title": "Questions 3-4",
+   "instructions": "Choose TWO letters, A-E. Which TWO measures helped the hatchlings?",
+   "list": [
+    "A  Replacing white lamps with amber ones",
+    "B  Asking residents to close their curtains",
+    "C  Banning all beach visitors",
+    "D  Switching off the hotels",
+    "E  Planting trees along the shore"
+   ]
+  },
+  {
+   "from": 5,
+   "to": 6,
+   "title": "Questions 5-6",
+   "instructions": "Complete the summary. Choose NO MORE THAN TWO WORDS from the passage.",
+   "text": "Boca Grande replaced its white lamps with {5} ones, and later added {6} near restaurants."
+  }
+ ],
+ "questions": [
+  {
+   "n": 1,
+   "type": "choice",
+   "text": "Hatchlings normally find the sea by moving towards the brightest part of the horizon.",
+   "options": [
+    "TRUE",
+    "FALSE",
+    "NOT GIVEN"
+   ],
+   "answer": "TRUE",
+   "evidence": "guided by the brightest horizon"
+  },
+  {
+   "n": 2,
+   "type": "choice",
+   "text": "On developed coasts the street lamps are dimmer than the water.",
+   "options": [
+    "TRUE",
+    "FALSE",
+    "NOT GIVEN"
+   ],
+   "answer": "FALSE",
+   "evidence": "street lamps and hotels shine more brightly than the water"
+  },
+  {
+   "n": [
+    3,
+    4
+   ],
+   "type": "multi",
+   "text": "Which TWO measures helped the hatchlings?",
+   "options": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+   ],
+   "picks": 2,
+   "answers": [
+    "A",
+    "B"
+   ],
+   "evidence": "replaced its white lamps with amber ones, which turtles barely notice, and asked residents to close their curtains after dark"
+  },
+  {
+   "n": 5,
+   "type": "gap",
+   "words": 1,
+   "answer": "amber",
+   "evidence": "replaced its white lamps with amber ones"
+  },
+  {
+   "n": 6,
+   "type": "gap",
+   "words": 2,
+   "answer": "motion sensors",
+   "accept": [
+    "motion sensor"
+   ],
+   "evidence": "add motion sensors near restaurants"
+  }
+ ]
+}
