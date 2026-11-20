@@ -145,6 +145,9 @@ assert(find(shown[#shown],'No offline definition found.\nTry another spelling or
 instance:showSmallPopup('noon',{results={{no_result=true}}})
 assert(shown[#shown].name=='english_small_lookup','unknown word uses the same compact popup')
 print('PASS: missing words stay compact and never fabricate a definition')
+instance:showSmallPopup('nerves',{results={{dict='en-en',word='nerf',definition='slang: weakening'},{dict='en-en',word='nerves',definition='nervousness'}}})
+assert(find(shown[#shown],'nervousness') and not find(shown[#shown],'slang: weakening'),'the exact headword beats near matches returned first by sdcv')
+print('PASS: exact headword shown before sdcv near matches')
 instance.ui.highlight={selected_text={text='A sentence from the actual selection.'}}
 assert(instance:selectedSentence('reluctantly')=='A sentence from the actual selection.','live text must replace sample text')
 instance.ui.highlight.selected_text.pos0='start';instance.ui.highlight.selected_text.pos1='end'

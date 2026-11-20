@@ -46,6 +46,20 @@ expected_updates=list(updates)
 updates=[p for p in updates if not (device/'koreadercus'/p).exists() or digest(stage/p)!=digest(device/'koreadercus'/p)]
 update_paths={str(Path('koreadercus')/p) for p in updates}
 metadata_paths={str(Path('koreadercus')/p.parent/('._'+p.name)) for p in updates}
+# New folders (e.g. voca/data/phonemizer) also get macOS AppleDouble files on FAT: expect and remove them.
+new_dirs=sorted({q for p in updates for q in (device/'koreadercus'/p).parents
+                 if q.is_relative_to(device/'koreadercus'/plugin) and not q.exists()},key=lambda q:len(q.parts))
+folder_metadata={(q.parent/('._'+q.name)).relative_to(device).as_posix() for q in new_dirs}
+metadata_paths|=folder_metadata
+pre_metadata={m for m in metadata_paths if (device/m).exists()}
+
+def remove_metadata(paths,keep_backup):
+    for rel in sorted(paths):
+        m=device/rel
+        if not m.exists():continue
+        with m.open('rb') as f:assert f.read(4)==b'\x00\x05\x16\x07', 'Not AppleDouble metadata: '+rel
+        if keep_backup:archive(Path(rel))
+        m.unlink()
 for p in ('frontend/docsettings.lua','frontend/ui/otamanager.lua','launch.sh'):
     assert digest(stage/p)==digest(device/'koreadercus'/p), 'Custom isolation changed; inspect before updating'
 logs={} if '--plugin-only' in sys.argv or '--ai-only' in sys.argv else {'adbreak.log':554,'koreadercus/crash.log':19306,'koreader/crash.log':178744}
@@ -99,6 +113,7 @@ try:
             with metadata.open('rb') as f:assert f.read(4)==b'\x00\x05\x16\x07'
             archive(metadata.relative_to(device))
             metadata.unlink()
+    remove_metadata(folder_metadata,keep_backup=False)
     print('Plugin files verified. Checking books/settings/profile protection...',flush=True)
     assert protected()==before, 'Protected files changed unexpectedly'
 except Exception:
@@ -108,6 +123,10 @@ except Exception:
         else:
             temp=dst.with_name(dst.name+'.rollback')
             copy_data(backup/entry['path'],temp);os.replace(temp,dst)
+    # Leave no metadata or empty folders from this attempt behind.
+    remove_metadata(metadata_paths-pre_metadata,keep_backup=False)
+    for q in reversed(new_dirs):
+        if q.is_dir() and not any(q.iterdir()):q.rmdir()
     raise
 
 for entry in cleanup:

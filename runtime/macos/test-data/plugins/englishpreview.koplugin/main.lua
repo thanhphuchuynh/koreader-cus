@@ -3,6 +3,7 @@ local UIManager = require('ui/uimanager')
 local TextViewer = require('ui/widget/textviewer')
 local DictQuickLookup = require('ui/widget/dictquicklookup')
 local Screen = require('device').screen
+local logger = require('logger')
 local Preview = WidgetContainer:extend{ name = 'englishpreview' }
 
 local samples = {
@@ -282,9 +283,12 @@ function Preview:idiomFor(highlight)
             self._phrases = require('english_phrases').new((self.path or '.')..'/english_phrases.tsv') or false
         end
         local found = self._phrases and self._phrases:find(context.text, context.at)
+        logger.info('Leaf: idiom', found and found.headword or 'none')
         if not found then return nil end
         pcall(function() -- no gloss is fine; the idiom still shows
+            local started = os.time()
             local results = self.ui.dictionary:startSdcv(found.headword, nil, false)
+            logger.info('Leaf: idiom gloss lookup', os.time()-started, 's')
             local first = results and results[1]
             if first and not first.no_result and first.definition then
                 -- startSdcv results don't carry is_html yet (set later by ReaderDictionary): sniff tags.
@@ -306,7 +310,11 @@ function Preview:showSmallPopup(word, options)
         unfamiliar = {ipa='/ˌʌn.fəˈmɪl.i.ər/ · adjective', text='Not known or recognized.\nXa lạ, không quen thuộc.'},
         threshold = {ipa='/ˈθreʃ.həʊld/ · noun', text='The entrance to a room or building.\nNgưỡng cửa.'},
     }
+    -- sdcv returns near matches too ("nerves" -> nerf, nerve, nerves): prefer the exact word.
     local result=options.results and options.results[1]
+    for _,r in ipairs(options.results or {}) do
+        if type(r.word)=='string' and r.word:lower()==word:lower() then result=r;break end
+    end
     local entry
     if result and result.no_result then
         entry={ipa='Offline dictionary',text='No offline definition found.\nTry another spelling or check your dictionary settings.'}
@@ -329,6 +337,7 @@ function Preview:showSmallPopup(word, options)
         text='IDIOM · '..idiom.text..(idiom.headword~=idiom.form and (' → '..idiom.headword) or '')
             ..(idiom.gloss and ('\n'..idiom.gloss) or '')..'\n\n'..text
     end
+    logger.info('Leaf: word popup', word, idiom and idiom.headword or '')
     return require('english_popup').show{
         title=word,subtitle=entry.ipa,text=text,on_close=options.on_close,
         speech=self:getSpeech(),speech_text=word,
@@ -399,12 +408,14 @@ function Preview:installTapLookup()
         -- Native selection owns word boxes, language support and vocabulary context.
         if owner:onHold(arg,ges) and owner.selected_text then
             owner:_resetHoldTimer(true)
+            logger.info('Leaf: tap lookup', owner.selected_text.text)
             owner:lookupDictWord()
             return true
         end
     end
     local originalShow = dictionary.showDict
     dictionary.showDict = function(owner, word, results, boxes, link, callback)
+        logger.info('Leaf: showDict', word, results and #results or 'nil', results and results.lookup_cancelled and 'cancelled' or '')
         if owner.is_wiki or not results or not results[1] or results.lookup_cancelled then
             return originalShow(owner,word,results,boxes,link,callback)
         end
