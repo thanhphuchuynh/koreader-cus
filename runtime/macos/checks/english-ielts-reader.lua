@@ -49,16 +49,31 @@ local function reader(content)
   r.passage='Boca Grande replaced its white lamps with ‘amber’ ones'
   local doc={getWordFromPosition=function() return {sbox={x=280,y=200,w=100,h=40}} end,
     getDocumentFileContent=function(_,p) assert(p=='META-INF/leaf-ielts.json');return content end,
-    getXPointer=function() return '/body/DocFragment[1]/body/p[2]/text().0' end,
+    getXPointer=function() return '/body/DocFragment['..r.frag..']/body/p[2]/text().0' end,
     getCurrentPage=function() return 7 end,
     clearSelection=function() r.cleared=r.cleared+1 end,
-    findText=function(_,pat,origin,dir,ci)
-      assert(origin==-1 and dir==1 and ci==true)
-      if r.passage:find(pat,1,true) then
-        return {{start='/body/DocFragment[2]/body/p[1]/text().0'},{start='/body/DocFragment[1]/body/p[3]/text().4'}}
+    -- Like cre.cpp: findText only searches from/around the current position (reverse=dir==1);
+    -- findAllText searches the whole book.
+    findText=function(_,pat,origin,reverse)
+      local hits={}
+      for _,h in ipairs(r.hits(pat)) do
+        local k=tonumber(h.start:match('DocFragment%[(%d+)%]'))
+        local after=(reverse and origin==-1) or (not reverse and origin~=-1)
+        if after and k>=r.frag or not after and k<=r.frag then hits[#hits+1]=h end
       end
+      return #hits>0 and hits or nil
+    end,
+    findAllText=function(_,pat,ci,ctx,max,regex)
+      assert(ci==true and max>0 and not regex)
+      local h=r.hits(pat);return #h>0 and h or nil
     end}
-  r.ui={menu={registerToMainMenu=function() end},rolling=true,highlight=highlight,document=doc,doc_settings=r.store,
+  r.frag=1
+  r.hits=function(pat)
+    if not r.passage:find(pat,1,true) then return {} end
+    return {{start='/body/DocFragment[1]/body/p[3]/text().4'},{start='/body/DocFragment[2]/body/p[1]/text().0'}}
+  end
+  r.events={}
+  r.ui={menu={registerToMainMenu=function() end},handleEvent=function(_,e) r.events[#r.events+1]=e;if r.boom then error('boom') end;return true end,rolling=true,highlight=highlight,document=doc,doc_settings=r.store,
     dictionary={addToDictButtons=function() end},view={footer=footer},
     link={onGotoLink=function(_,l) r.gotos[#r.gotos+1]=l.xpointer end}}
   r.plugin=setmetatable({ui=r.ui},{__index=Preview})
@@ -114,10 +129,26 @@ bannerButton('Done')()
 assert(st.picking==nil and #panels==n1+1 and r.tapped==nil,'Done returns to panel')
 -- After picking, taps look up words again.
 assert(r.tap('reluctantly')==true and r.tapped=='reluctantly')
+-- A failing pick must not break tapping.
+st.picking=99;r.tapped=nil
+assert(r.tap('word')==true and r.tapped==nil,'pick errors are contained')
+st.picking=nil
+-- Banner: input outside it goes to the reader; its own area, broadcasts and reader errors stay put.
+panels[#panels].on_pick(6)
+local b=st.banner
+local function pos(inside) return {intersectWith=function() return inside end} end
+b.dimen={}
+assert(b:handleEvent({handler='onGesture',args={{pos=pos(false)}}})==true and #r.events==1,'tap outside forwarded')
+assert(b:handleEvent({handler='onGesture',args={{pos=pos(true)}}})==true and #r.events==1,'tap on banner kept')
+assert(b:handleEvent({handler='onKeyPress',args={}})==true and #r.events==2,'key page turn forwarded')
+assert(not b:handleEvent({handler='onPageUpdate',args={}}) and #r.events==2,'broadcasts not doubled')
+r.boom=true;assert(not b:handleEvent({handler='onKeyPress',args={}}),'reader error contained');r.boom=nil
+bannerButton('Done')()
 print('PASS: test footer and mode prompt, footer tap opens panel, word pick fills gaps without dictionary')
 
 -- Evidence: straight-quote evidence finds a curly-quote passage, only inside the question's chapter.
-panels[#panels].on_evidence({n=5,evidence="lamps with 'amber' ones"})
+r.frag=2
+panels[#panels].on_evidence({n=5,evidence="replaced its white lamps with 'amber' ones"})
 assert(r.gotos[#r.gotos]=='/body/DocFragment[1]/body/p[3]/text().4','evidence jump in passage chapter: '..tostring(r.gotos[#r.gotos]))
 local c=r.cleared
 r.plugin:onPageUpdate(7);assert(r.cleared==c,'same page keeps highlight')
@@ -126,7 +157,11 @@ r.plugin:onPageUpdate(9);assert(r.cleared==c+1)
 local before=#shown
 panels[#panels].on_evidence({n=5,evidence='not in the passage'})
 assert(#shown==before+1 and #panels>0,'missing evidence says so')
-print('PASS: evidence found across quote styles in its chapter, cleared on page turn')
+before=#shown
+panels[#panels].on_evidence({n=5,evidence="with 'amber' ones"})
+assert(#shown==before+1 and #r.gotos==1,'short quote-free fallback must not match a stray fragment')
+r.frag=1
+print('PASS: evidence found book-wide across quote styles in its chapter, cleared on page turn')
 
 -- Time up: once.
 local function infos() local k=0 for _,w in ipairs(shown) do if w.text=='Time is up — you can keep answering.' then k=k+1 end end return k end
@@ -135,6 +170,13 @@ scheduled[1][2]();assert(infos()==0)
 clock=clock+20*60
 scheduled[#scheduled][2]();assert(infos()==1,'time up shown')
 scheduled[#scheduled][2]();assert(infos()==1,'time up shown once')
+-- Finished tests stop the clock: resume and reopen do not restart it.
+st.session:finish();st.session:pause(clock);r.plugin:onResume()
+assert(st.session.startedAt==nil,'resume after Finish must not restart the clock')
+local r2=reader(KEY);r2.store.data.leaf_ielts=r.store.data.leaf_ielts;r2.plugin:onReaderReady()
+assert(r2.plugin._ielts and r2.plugin._ielts.session.startedAt==nil,'reopen after Finish must not restart the clock')
+r2.plugin:onCloseDocument()
+st.session.rec.finished=nil;st.session:start(clock)
 -- Suspend/close persist elapsed; close removes footer and restores native taps.
 r.plugin:onSuspend();local e=st.session.rec.elapsed;clock=clock+500;r.plugin:onResume();clock=clock+10
 r.plugin:onCloseDocument()

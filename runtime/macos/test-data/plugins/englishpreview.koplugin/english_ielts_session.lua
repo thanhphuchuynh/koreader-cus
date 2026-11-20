@@ -52,6 +52,7 @@ end
 function M:timeUpNoticed() return self.rec.timeUp==true end
 function M:noteTimeUp() self.rec.timeUp=true;self:save() end
 function M:finish() self.rec.finished=true;self:save() end
+function M:finished() return self.rec.finished==true end
 function M:reset()
   self.rec={mode=self.rec.mode,answers={},elapsed=0}
   self.startedAt=nil;self:save()

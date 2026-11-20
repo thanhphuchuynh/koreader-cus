@@ -161,7 +161,7 @@ function Preview:onSuspend()
 end
 
 function Preview:onResume()
-    if self._ielts then self._ielts.session:start(os.time()) end
+    if self._ielts and not self._ielts.session:finished() then self._ielts.session:start(os.time()) end
 end
 
 -- IELTS Reading: a test EPUB carries META-INF/leaf-ielts.json. Any failure leaves the book as a normal book.
@@ -189,7 +189,7 @@ function Preview:loadIelts()
                 end
             end
         end
-        session:start(os.time())
+        if not session:finished() then session:start(os.time()) end
         UIManager:scheduleIn(60,st.tick)
         logger.info('Leaf: ielts test',test.total,'questions, mode',session:mode() or 'unset')
         if not session:mode() then self:askIeltsMode() end
@@ -256,7 +256,7 @@ function Preview:showQuestions(n,offset)
     local passage=p and p.n or self:ieltsChapter()
     logger.info('Leaf: ielts panel passage',passage)
     require('english_ielts_panel').show{test=st.test,session=st.session,passage=passage,offset=offset,
-        results=st.session.rec.finished,now=os.time,
+        results=st.session:finished(),now=os.time,
         on_pick=function(q,off) self:ieltsPick(q,off) end,
         on_passage=function() self:ieltsFooterRefresh() end,
         on_evidence=function(q) self:showEvidence(q) end}
@@ -323,10 +323,13 @@ function Preview:ieltsBanner()
     local handle=banner.handleEvent
     banner.handleEvent=function(b,event)
         if handle(b,event) then return true end
-        if event.handler~='onGesture' then return end
-        local ges=event.args and event.args[1]
+        -- Input only: broadcasts already reach the reader directly, forwarding them would double them.
+        if event.handler~='onGesture' and event.handler~='onKeyPress' and event.handler~='onKeyRepeat' then return end
+        local ges=event.handler=='onGesture' and event.args and event.args[1]
         if b.dimen and ges and ges.pos and ges.pos:intersectWith(b.dimen) then return true end -- the banner itself
-        if self.ui.handleEvent then return self.ui:handleEvent(event) end
+        local ok,res=pcall(self.ui.handleEvent,self.ui,event)
+        if not ok then logger.info('Leaf: ielts error',res) end
+        return ok and res
     end
     st.banner=banner
     UIManager:show(banner,'ui')
@@ -347,8 +350,10 @@ function Preview:ieltsType()
     dialog:onShowKeyboard()
 end
 
--- Jump to a question's evidence inside its passage chapter; crengine keeps the hit highlighted
--- (as ReaderSearch relies on for EPUB) until the next page turn or tap.
+-- Jump to a question's evidence inside its passage chapter. findAllText searches the whole book
+-- (findText only searches near the current page) and crengine keeps its hits highlighted
+-- until the next page turn or tap.
+local MIN_FALLBACK=20 -- the quote-free fallback must be long enough not to match a stray fragment
 function Preview:showEvidence(q)
     local st=self._ielts
     if not st or not q then return end
@@ -363,9 +368,10 @@ function Preview:showEvidence(q)
         part=part:match('^%s*(.-)%s*$')
         if #part>#longest then longest=part end
     end
+    if #longest<MIN_FALLBACK then longest='' end
     for _,pattern in ipairs({ev,folded,longest}) do
         if pattern~='' then
-            local ok,hits=pcall(doc.findText,doc,pattern,-1,1,true,nil,false,100)
+            local ok,hits=pcall(doc.findAllText,doc,pattern,true,0,100,false)
             for _,hit in ipairs(ok and type(hits)=='table' and hits or {}) do
                 local k=tonumber(tostring(hit.start):match('DocFragment%[(%d+)%]'))
                 if not p or k==p.n then
@@ -650,7 +656,8 @@ function Preview:installTapLookup()
             if self._ielts and self._ielts.picking then -- filling a gap: the word is the answer, not a lookup
                 local text = owner.selected_text.text
                 owner:clear()
-                self:ieltsPickWord(text)
+                local ok, err = pcall(self.ieltsPickWord, self, text)
+                if not ok then logger.info('Leaf: ielts error', err) end
                 return true
             end
             logger.info('Leaf: tap lookup', owner.selected_text.text)

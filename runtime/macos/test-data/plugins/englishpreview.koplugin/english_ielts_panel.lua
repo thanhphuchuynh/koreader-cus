@@ -73,7 +73,7 @@ function M.show(o)
       buttons{{text='Show in passage',callback=function() UI:close(widget);o.on_evidence(test.byNumber[row.n]) end}}
     end
     gap()
-    buttons{{text='Try again',callback=function() session:reset();redraw{results=false,offset=false} end},
+    buttons{{text='Try again',callback=function() session:reset();session:start(now());redraw{results=false,offset=false} end},
       {text='Done',callback=function() UI:close(widget);o.on_passage() end}}
   else
     local multi=#test.passages>1
