@@ -64,6 +64,7 @@ assert(#session:answer(3)==2 and session:answer(3)[1]=='B','multi capped at pick
 button('B')();assert(#session:answer(3)==1)
 local closedW,closedMode;UI.close=function(_,w,mode) closedW=w;closedMode=mode end
 local before=shown[#shown];before._scroll.off={x=0,y=40}
+assert(walk(shown[#shown],function(t) return t.text=='6  ____' end).align=='left','question rows are left-aligned')
 button('6  ____')() ;assert(picked==6 and pickedOff.y==40 and closedW==before,'gap tap closes panel, passes scroll')
 -- Leaving the panel for the passage must refresh the screen, or the panel ghosts on E Ink
 -- (UIManager:close with no refresh type repaints the reader but never updates the display).

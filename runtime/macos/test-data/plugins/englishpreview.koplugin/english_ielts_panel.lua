@@ -25,7 +25,7 @@ function M.show(o)
   local test,session=o.test,o.session
   local w,h=Screen:getWidth(),Screen:getHeight()
   local pad=Screen:scaleBySize(12)
-  local inner=w-2*pad
+  local inner=w-2*pad-Screen:scaleBySize(18) -- room for the scrollbar (ScrollableContainer: 3 x 6)
   local now=o.now or os.time
   local widget=InputContainer:new{name='english_ielts_panel',dimen=Geom:new{x=0,y=0,w=w,h=h}}
   local col=VerticalGroup:new{align='left'}
@@ -116,7 +116,7 @@ function M.show(o)
         if q.text then text(q.text) end
         local label=shown(n,session:answer(n))
         if not inline[n] then label=((q.before or '')..' '..label..' '..(q.after or '')):match('^%s*(.-)%s*$') end
-        buttons{{text=('%d  %s'):format(n,label),callback=L and function()
+        buttons{{align='left',text=('%d  %s'):format(n,label),callback=L and function()
           local words=test.byNumber[n].words
           local dialog
           dialog=require('ui/widget/inputdialog'):new{title=('Q%d%s'):format(n,words and (' · up to %d word%s'):format(words,words==1 and '' or 's') or ''),
@@ -175,7 +175,7 @@ function M.show(o)
       end
       question(q)
       if L and audio and q.at and session:mode()=='study' then
-        buttons{{text=('↺ %d:%02d'):format(math.floor(q.at[1]/60),math.floor(q.at[1]%60)),callback=function() audio:play(q.at[1]) end}}
+        buttons{{align='left',text=('↺ %d:%02d'):format(math.floor(q.at[1]/60),math.floor(q.at[1]%60)),callback=function() audio:play(q.at[1]) end}}
       end
     end
     gap()
