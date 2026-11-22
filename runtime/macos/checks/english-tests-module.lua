@@ -42,25 +42,29 @@ local function has(s) return walk(widget,function(t) return t.text==s end) end
 local function hasSub(s) return walk(widget,function(t) return type(t.text)=='string' and t.text:find(s,1,true) end) end
 local function btn(l) local b=walk(widget,function(t) return t.text==l and t.callback end);assert(b,'no button '..l);return b.callback end
 widget=M.build(560,{pfx='x_'});assert(dirSeen=='/home/IELTS')
-for _,s in ipairs{'TESTS','CONTINUE','ALL TESTS','3','1','tests','finished','last band','Alpha','Beta','Gamma','Not started','In progress · 3/6 answered · 12:40 left','Continue','Review','Start'} do assert(has(s),'missing '..s) end
-assert(hasSub('13/13 · Band ≈ '),'done line')
+for _,s in ipairs{'TESTS','CONTINUE','ALL TESTS','3','1','tests','finished','last band','Alpha','Gamma · Not started','In progress · 3/6 answered · 12:40 left','Continue','Review…','Start'} do assert(has(s),'missing '..s) end
+assert(hasSub('Beta · 13/13 · Band ≈ '),'done line')
+-- one-line rows: text, span, button; row height = button height
+assert(walk(widget,function(t) return #t==3 and t[3].width==140 and t[1].max_width==560-140-12 and t:getSize().h==t[3].height end),'one-line row')
 -- band value from a 13-question test, rough
 local I=require('english_ielts');local bd,rough=I.band(13,13)
 assert(hasSub('Band ≈ '))
 local opened,rev,ret
 M.actions={open=function(p) opened=p end,review=function(p) rev=p end,retry=function(p) ret=p end}
 btn('Continue')();assert(opened=='/home/IELTS/a.epub')
-btn('Review')();assert(rev=='/home/IELTS/b.epub');assert(not has('Retry'),'Retry only in the list');btn('Start')()
+btn('Review…')();local rd=shown[#shown];assert(rd.kind=='dialog' and rd.title=='Beta' and rd.buttons[1][1].text=='Review' and rd.buttons[1][2].text=='Retry')
+rd.buttons[1][1].callback();assert(rev=='/home/IELTS/b.epub' and closed[rd]);rd.buttons[1][2].callback();assert(ret=='/home/IELTS/b.epub')
+btn('Start')()
 assert(opened=='/home/IELTS/c.epub')
-for _,b in ipairs{'Continue','Review','Start'} do assert(walk(widget,function(t) return t.text==b and t.height>=44 end),b..' height') end
-local n=0;walk(widget,function(t) if t.text=='Alpha' then n=n+1 end end);assert(n==1,'continue item not repeated')
+for _,b in ipairs{'Continue','Review…','Start'} do assert(walk(widget,function(t) return t.text==b and t.height>=44 end),b..' height') end
+local n=0;walk(widget,function(t) if t.text=='Alpha' then n=n+1 end end);assert(n==1 and not hasSub('Alpha · '),'continue item not repeated')
 -- dots: 3 of 6 answered
 assert(walk(widget,function(t) return t.text=='■ ■ ■ □ □ □' end),'dots')
 -- long test: 13 dots then …total
 files['/home/IELTS/d.epub']=book('Delta',20,40,1);recs['/home/IELTS/d.epub']={mode='study',answers={[1]='a1'},elapsed=0};listed[4]='/home/IELTS/d.epub';mt['/home/IELTS/d.epub']=200
 widget=M.build(560,{});assert(walk(widget,function(t) return type(t.text)=='string' and t.text:find('…40',1,true) and select(2,t.text:gsub('■',''))+select(2,t.text:gsub('□',''))==13 end),'long dots')
-assert(has('3/6 · 12:40 left'),'practice row status')
-mt['/home/IELTS/d.epub']=0;widget=M.build(560,{});assert(has('1/40'),'study row status')
+assert(has('Alpha · 3/6 · 12:40 left'),'practice row status')
+mt['/home/IELTS/d.epub']=0;widget=M.build(560,{});assert(has('Delta · 1/40'),'study row status')
 assert(M.getHeight({col_w=560})==widget:getSize().h,'getHeight matches build')
 assert(not hasSub('All tests'),'no All tests button with few tests')
 -- empty
@@ -71,15 +75,15 @@ assert(M.getHeight({col_w=560})==widget:getSize().h)
 listed={'/home/IELTS/a.epub'};local calls={}
 package.preload['features/sui_module_chrome']=function() return {resolve=function(p,id) calls[#calls+1]=id return {} end,contentWidth=function(c) return c-40 end} end
 assert(M.getHeight({col_w=600,pfx='x_'})==M.build(560,{}):getSize().h and calls[1]=='leaf_tests','getHeight at inset width')
--- 10 tests: at most 6 rows, then All tests (10) opening a Menu of every test
+-- 10 tests: 3 rows with a continue card (5 without), then All tests (10) opening a Menu of every test
 listed={};recs={};mt={}
 for i=1,10 do local p=('/home/IELTS/t%02d.epub'):format(i);files[p]=book(('T%02d'):format(i),20,6,1);listed[i]=p end
 recs[listed[1]]={mode='practice',answers=three,elapsed=0};mt[listed[1]]=9
 recs[listed[2]]={mode='practice',answers=ans,elapsed=1,finished=true}
 widget=M.build(560,{})
-local rows=0;walk(widget,function(t) if t.callback and t.width==140 then rows=rows+1 end end) -- row buttons are w/4 wide
-assert(rows==6,'rows '..rows)
-assert(walk(widget,function(t) return t.text=='All tests (10)' and t.callback and t.height>=44 end),'All tests button')
+local function rows() local r=0;walk(widget,function(t) if t.callback and t.width==140 then r=r+1 end end) return r end -- row buttons are w/4 wide
+local function allLast() local b=widget[#widget];return b.text=='All tests (10)' and b.callback and b.height>=44 and widget[#widget-2][3].width==140 end
+assert(has('CONTINUE') and rows()==3 and allLast(),'3 rows + All tests after the card')
 btn('All tests (10)')();local menu=shown[#shown];assert(menu.kind=='menu' and menu.title=='Tests' and #menu.item_table==10)
 local function entry(title) for _,e in ipairs(menu.item_table) do if e.text:find(title..' · ',1,true)==1 then return e end end end
 assert(entry('T03').text=='T03 · Not started' and entry('T01').text=='T01 · 3/6 · 20:00 left')
@@ -88,4 +92,5 @@ local function act(title,label) entry(title).callback();local d=shown[#shown];as
 ret=nil;local d=act('T02','Retry');assert(ret==listed[2] and #d.buttons[1]==2 and d.buttons[1][1].text=='Review')
 act('T02','Review');assert(rev==listed[2]);act('T03','Start');assert(opened==listed[3]);act('T01','Continue');assert(opened==listed[1])
 assert(#shown[#shown].buttons[1]==1,'no Retry before finishing')
+recs[listed[1]]=nil;widget=M.build(560,{});assert(not has('CONTINUE') and rows()==5 and allLast(),'5 rows + All tests without the card')
 print('PASS: tests module layout, actions, empty state')

@@ -8,35 +8,34 @@ function M.getMenuItems() return nil end
 
 local dio
 local function defaultIO() dio=dio or Tests.defaultIO() return dio end
-local MAX_ROWS=6 -- ponytail: fixed cap, use engine height if a screen ever needs more
+-- ponytail: fixed caps sized for 600x800, use engine height if a screen ever needs more
+local MAX_ROWS_WITH_CARD,MAX_ROWS=3,5
 local function clock(sec) return ('%02d:%02d'):format(math.floor(sec/60),sec%60) end
 local function status(it)
   if it.state=='new' then return 'Not started' end
   if it.state=='progress' then return ('%d/%d'):format(it.answered,it.total)..(it.remaining and ' · '..clock(it.remaining)..' left' or '') end
   return ('%d/%d · Band ≈ %s'):format(it.right,it.total,it.band)..(it.rough and ' (rough)' or '')
 end
--- The one action a compact row offers.
-local function primary(it)
-  if it.state=='new' then return 'Start','open' elseif it.state=='progress' then return 'Continue','open' end
-  return 'Review','review'
+-- Dialog with the actions a test's state allows; closes itself (and `menu`, if given) before acting.
+local function actions(it,menu)
+  local UIManager=require('ui/uimanager')
+  local dialog
+  local function b(t,act) return {text=t,callback=function() UIManager:close(dialog);if menu then UIManager:close(menu) end;M.actions[act](it.path) end} end
+  local row
+  if it.state=='done' then row={b('Review','review'),b('Retry','retry')}
+  else row={b(it.state=='new' and 'Start' or 'Continue','open')} end
+  dialog=require('ui/widget/buttondialog'):new{title=it.title,buttons={row}}
+  UIManager:show(dialog)
 end
 
--- Every test in a KOReader Menu; an entry opens a dialog with the actions its state allows.
+-- Every test in a KOReader Menu; an entry opens its actions dialog.
 local function showAll(items)
   local UIManager=require('ui/uimanager')
   local Menu=require('ui/widget/menu')
-  local ButtonDialog=require('ui/widget/buttondialog')
   local menu
   local list={}
   for _,it in ipairs(Tests.ordered(items)) do
-    list[#list+1]={text=it.title..' · '..status(it),callback=function()
-      local dialog
-      local function b(t,act) return {text=t,callback=function() UIManager:close(dialog);UIManager:close(menu);M.actions[act](it.path) end} end
-      local row={b(primary(it))}
-      if it.state=='done' then row[2]=b('Retry','retry') end
-      dialog=ButtonDialog:new{title=it.title,buttons={row}}
-      UIManager:show(dialog)
-    end}
+    list[#list+1]={text=it.title..' · '..status(it),callback=function() actions(it,menu) end}
   end
   menu=Menu:new{title='Tests',item_table=list,covers_fullscreen=true,is_borderless=true,is_popout=false}
   UIManager:show(menu)
@@ -80,15 +79,15 @@ local function build(w)
     col[#col+1]=Button:new{text='Continue',height=btnH,width=math.floor((w-pad)/2),callback=function() M.actions.open(it.path) end}
   end
   local bw=math.floor(w/4)
-  local function row(it) -- one line: title and status left, one button right
-    local t,act=primary(it)
-    local tw=w-bw-pad
+  local function row(it) -- one line `title · status`, one button right; row height = button height
+    local t,fn
+    if it.state=='done' then t,fn='Review…',function() actions(it) end
+    else t,fn=it.state=='new' and 'Start' or 'Continue',function() M.actions.open(it.path) end end
     gap(math.floor(pad/2))
     col[#col+1]=HG:new{align='center',
-      VG:new{align='left',TW:new{text=it.title,face=Font:getFace('tfont',18),max_width=tw},
-        TW:new{text=status(it),face=Font:getFace('cfont',15),max_width=tw}},
+      TW:new{text=it.title..' · '..status(it),face=Font:getFace('cfont',18),max_width=w-bw-pad},
       HS:new{width=pad},
-      Button:new{text=t,height=btnH,width=bw,callback=function() M.actions[act](it.path) end}}
+      Button:new{text=t,height=btnH,width=bw,callback=fn}}
   end
   local s=Tests.summary(items)
   label('TESTS')
@@ -103,14 +102,15 @@ local function build(w)
   local cont=Tests.continueItem(items)
   if cont then label('CONTINUE');card(cont) end
   label('ALL TESTS')
+  local cap=cont and MAX_ROWS_WITH_CARD or MAX_ROWS
   local shown,more=0,false
   for _,it in ipairs(Tests.ordered(items)) do
     if it~=cont then
-      if shown<MAX_ROWS then row(it);shown=shown+1 else more=true end
+      if shown<cap then row(it);shown=shown+1 else more=true end
     end
   end
-  if more then
-    gap()
+  if more then -- right after the last row, so it stays on screen
+    gap(math.floor(pad/2))
     col[#col+1]=Button:new{text=('All tests (%d)'):format(#items),height=btnH,width=w,callback=function() showAll(items) end}
   end
   return col
