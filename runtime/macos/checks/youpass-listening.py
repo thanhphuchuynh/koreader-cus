@@ -42,4 +42,5 @@ assert m['evidence'] == 'Bring boots.'
 for kind in ('MAP_DIAGRAM_LABEL',):
     try: yp.convert_listening(quiz(kind), transcripts, {1: 60.0, 2: 90.0}); raise SystemExit('no ValueError')
     except ValueError: pass
+assert yp.title_of({'title': '[YouPass Collect] - Section 1: Radio'}) == 'Section 1: Radio'
 print('PASS: youpass-listening')

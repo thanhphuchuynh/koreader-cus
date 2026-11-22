@@ -260,7 +260,7 @@ function Preview:ieltsBarOptions()
     else
         o.tab='passage'
         if st.test.skill=='listening' then o.passage_label='Transcript' end
-        local left=st.session:remaining(os.time())
+        local left=st.test.skill~='listening' and st.session:remaining(os.time()) -- listening time is the audio's
         if left then o.timer=('%02d:%02d'):format(math.floor(left/60),left%60) end
     end
     return o

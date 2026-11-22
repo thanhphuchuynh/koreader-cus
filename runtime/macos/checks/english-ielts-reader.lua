@@ -413,7 +413,7 @@ assert(#panels==np+1 and panels[#panels].audio==nil and panels[#panels].exam_lef
 -- Finished: reading bars labelled Transcript; Hear it works
 nb=#bars
 local lr6=lreader(dir..'/l.epub',{mode='practice',answers={},elapsed=0,finished=true});ticks[#ticks]()
-assert(#bars==nb+1 and live().o.passage_label=='Transcript','finished: Transcript bars')
+assert(#bars==nb+1 and live().o.passage_label=='Transcript' and live().o.timer==nil,'finished: Transcript bars, no reading timer')
 lr6.plugin:showQuestions();local au6=audios[#audios];panels[#panels].on_hear({at={30,40}})
 assert(lastCall(au6)[2]==30 and lastCall(au6)[3]==41,'Hear it after finish')
 lr6.plugin:onCloseDocument()

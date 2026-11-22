@@ -95,7 +95,7 @@ def add_questions(t, p, paras, extra=lambda q, item: None):
         t['groups'].append(g)
     return lo, hi
 
-def title_of(d): return re.sub(r'^\[[^\]]*\]\s*', '', d['title']).strip()
+def title_of(d): return re.sub(r'^\[[^\]]*\][\s\-–]*', '', d['title']).strip()
 
 def slugify(title): return re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')
 
