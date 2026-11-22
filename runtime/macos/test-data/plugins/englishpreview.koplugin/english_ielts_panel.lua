@@ -172,10 +172,11 @@ function M.show(o)
   local body=scroll
   if Bars then
     body=VerticalGroup:new{align='left',top,
-      FrameContainer:new{padding=0,padding_left=pad,bordersize=0,height=dh,TextBox:new{text=dotsText,face=Font:getFace('cfont',15),width=inner}},
+      require('ui/widget/container/leftcontainer'):new{dimen=Geom:new{w=w,h=dh}, -- FrameContainer height is paint-only, not layout
+        FrameContainer:new{padding=0,padding_left=pad,bordersize=0,TextBox:new{text=dotsText,face=Font:getFace('cfont',15),width=inner}}},
       scroll,bottom}
   end
-  widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,body}
+  widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,width=w,height=h,body} -- white to the screen edge
   widget._col=col
   UI:show(widget,o.refresh or 'full')
   return widget

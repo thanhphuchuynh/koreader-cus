@@ -10,25 +10,30 @@ local function dims()
   return Screen:getWidth(),Screen:getHeight(),s
 end
 
--- Equal-width row inside a 1px frame; `selected` buttons are inverted (preselect), as in english_ielts_panel.lua.
+-- Equal-width buttons (borderless frame, so the bar is exactly M.height()) plus fixed-width label/timer cells,
+-- filling exactly w; `selected` buttons are inverted (preselect), as in english_ielts_panel.lua.
 local function row(w,items,extra,parent)
   local Frame=require('ui/widget/container/framecontainer')
   local HGroup=require('ui/widget/horizontalgroup')
   local Button=require('ui/widget/button')
   local TextWidget=require('ui/widget/textwidget')
+  local Center=require('ui/widget/container/centercontainer')
+  local Geom=require('ui/geometry')
   local Font=require('ui/font')
   local Blitbuffer=require('ffi/blitbuffer')
   local _,_,bh=dims()
-  local frame=Frame:new{padding=0,margin=0,bordersize=1,background=Blitbuffer.COLOR_WHITE,width=w,height=bh}
+  local frame=Frame:new{padding=0,margin=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,width=w,height=bh}
   local g=HGroup:new{align='center'}
   local lw=extra and extra.label and math.floor(w*0.4) or 0
-  if lw>0 then g[#g+1]=TextWidget:new{text=extra.label,face=Font:getFace('cfont',18),max_width=lw} end
+  local function cell(text,cw) return Center:new{dimen=Geom:new{w=cw,h=bh},TextWidget:new{text=text,face=Font:getFace('cfont',18),max_width=cw}} end
+  if lw>0 then g[#g+1]=cell(extra.label,lw) end
   local tw=extra and extra.timer and math.floor(w*0.25) or 0
-  local bw=math.floor((w-lw-tw-2)/#items)
-  for _,b in ipairs(items) do
-    g[#g+1]=Button:new{text=b.text,callback=b.callback,preselect=b.selected,width=bw,height=bh-2,padding_v=0,margin=0,bordersize=1,show_parent=parent}
+  local bw=math.floor((w-lw-tw)/#items)
+  for i,b in ipairs(items) do
+    local last=i==#items and w-lw-tw-bw*(#items-1) or bw -- last button takes the rounding remainder
+    g[#g+1]=Button:new{text=b.text,callback=b.callback,preselect=b.selected,width=last,height=bh-2,padding_v=0,margin=0,bordersize=1,show_parent=parent}
   end
-  if extra and extra.timer then g[#g+1]=TextWidget:new{text=extra.timer,face=Font:getFace('cfont',18),max_width=tw} end
+  if tw>0 then g[#g+1]=cell(extra.timer,tw) end
   frame[1]=g
   return frame
 end
@@ -78,15 +83,20 @@ function M.overlay(o)
     if event.handler~='onGesture' and event.handler~='onKeyPress' and event.handler~='onKeyRepeat' then return end
     local ges=event.handler=='onGesture' and event.args and event.args[1]
     local y=ges and ges.pos and ges.pos.y
-    if y and (y<bar or y>=h-bar) then return true end -- a bar's own strip, also beside its buttons
+    -- Swallow only tap/hold/swipe starting in a bar's strip (beside its buttons); releases and drags
+    -- always reach the reader, or a hold-drag released over a bar leaves ReaderHighlight stuck.
+    local starts=ges and (ges.ges=='tap' or ges.ges=='hold' or ges.ges=='swipe')
+    if starts and y and (y<bar or y>=h-bar) then return true end
     return o.forward and o.forward(event)
   end
   build()
   UI:show(ov,'ui',region(0))
   UI:setDirty(ov,'ui',region(h-bar))
   function handle:update(n)
+    local same=n.pick==o.pick and n.tab==o.tab and n.view==o.view -- else only the timer changed
     o=n;build()
-    UI:setDirty(ov,'ui',region(0));UI:setDirty(ov,'ui',region(h-bar))
+    UI:setDirty(ov,'ui',region(0))
+    if not same then UI:setDirty(ov,'ui',region(h-bar)) end
   end
   function handle:heights() return bar,bar end
   function handle:close() if ov then UI:close(ov);ov=nil end end

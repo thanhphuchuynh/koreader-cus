@@ -15,6 +15,7 @@ for _,n in ipairs({'framecontainer','button','horizontalgroup','verticalgroup','
 end
 package.preload['ui/widget/container/inputcontainer']=function() return Input end
 package.preload['ui/widget/container/framecontainer']=function() return Widget end
+package.preload['ui/widget/container/centercontainer']=function() return Widget end
 package.preload['ui/widget/confirmbox']=function() return {new=function(_,t) boxes[#boxes+1]=t;return t end} end
 package.preload['ui/font']=function() return {getFace=function() return {} end} end
 package.preload['ffi/blitbuffer']=function() return {COLOR_WHITE=255,COLOR_BLACK=0} end
@@ -52,9 +53,14 @@ local function fits(w)
     return false end)
 end
 fits(B.top(600,{tab='passage',timer='12:34'}));fits(B.bottom(600,{view='passage'}))
-local sum=0
-for _,x in ipairs(B.top(600,{tab='passage',timer='12:34'})[1]) do sum=sum+(x.width or x.max_width or 0) end
-assert(sum<=600,'top row wider than screen: '..sum)
+-- rows fill exactly the width (label/timer in fixed-width cells), frame has no border so the bar is exactly Bars.height
+for _,r in ipairs({B.top(600,{tab='passage',timer='12:34'}),B.top(600,{tab='passage'}),B.top(600,{pick=3}),B.bottom(600,{view='passage'})}) do
+  assert(r.bordersize==0 and r.height==B.height(),'bar frame: no border, exact height')
+  local sum=0
+  for _,x in ipairs(r[1]) do local cw=x.width or (x.dimen and x.dimen.w);assert(cw,'cell without fixed width');sum=sum+cw end
+  assert(sum==600,'row must fill the width: '..sum)
+end
+assert(#B.top(600,{pick=3})[1]==3,'pick form: label + Done + Cancel, no timer cell')
 -- confirmFinish
 local yes=false
 B.confirmFinish(function() yes=true end)
@@ -71,10 +77,16 @@ local th,bh=h:heights();assert(th>=44 and bh>=44)
 local function tap(y) return {handler='onGesture',args={{ges='tap',pos={x=100,y=y}}}} end
 assert(ov:handleEvent(tap(400)) and #fwd==1,'tap outside forwarded')
 assert(ov:handleEvent(tap(th-1)) and ov:handleEvent(tap(800-bh+1)) and #fwd==1,'tap in a bar stays')
-ov:handleEvent({handler='onKeyPress',args={{}}});assert(#fwd==2,'keys forwarded')
-ov:handleEvent({handler='onPageUpdate',args={}});assert(#fwd==2,'broadcasts are not forwarded')
+local function g(kind,y) return {handler='onGesture',args={{ges=kind,pos={x=100,y=y}}}} end
+assert(ov:handleEvent(g('hold',5)) and ov:handleEvent(g('swipe',795)) and #fwd==1,'hold/swipe starting in a bar stay')
+for _,k in ipairs({'hold_pan','hold_release','pan_release'}) do
+  local n=#fwd;ov:handleEvent(g(k,5));ov:handleEvent(g(k,795));assert(#fwd==n+2,k..' over a bar must reach the reader')
+end
+local nf=#fwd;ov:handleEvent({handler='onKeyPress',args={{}}});assert(#fwd==nf+1,'keys forwarded')
+ov:handleEvent({handler='onPageUpdate',args={}});assert(#fwd==nf+1,'broadcasts are not forwarded')
 assert(has(ov,'01:00'));local nd=#dirty
 o.timer='02:00';h:update(o)
-assert(has(ov,'02:00') and not has(ov,'01:00') and #dirty>nd and dirty[#dirty][2]=='ui','update rebuilds in place')
+assert(has(ov,'02:00') and not has(ov,'01:00') and #dirty==nd+1 and dirty[#dirty][2]=='ui' and dirty[#dirty][3].y==0,'timer-only update refreshes the top bar only')
+nd=#dirty;h:update({pick=4,forward=o.forward});assert(#dirty==nd+2,'form change refreshes both bars')
 h:close();h:close();assert(#closed==1 and closed[1]==ov,'close once')
 print('PASS')

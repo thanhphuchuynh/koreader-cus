@@ -6,9 +6,9 @@ local d=J.decode(raw);for _,p in ipairs(d.passages) do p.paragraphs=nil end
 local KEY=J.encode(d)
 local clock=1000;os.time=function() return clock end
 trace=nil
-local shown,closed,scheduled,unscheduled,dirty={},{},{},0,0
+local shown,closed,scheduled,unscheduled,dirty,ticks={},{},{},0,0,{}
 local UI={show=function(_,w,mode,region,x,y) shown[#shown+1]=w;w._at={x=x,y=y} end,close=function(_,w) closed[#closed+1]=w end,
-  scheduleIn=function(_,s,fn) scheduled[#scheduled+1]={s,fn} end,unschedule=function() unscheduled=unscheduled+1 end,
+  scheduleIn=function(_,s,fn) scheduled[#scheduled+1]={s,fn} end,nextTick=function(_,fn) ticks[#ticks+1]=fn end,unschedule=function() unscheduled=unscheduled+1 end,
   setDirty=function(_,w,mode) dirty=dirty+1;if trace then trace[#trace+1]='dirty:'..tostring(w)..':'..tostring(mode) end end}
 local Widget={};function Widget:new(t) t=t or {};t.handleEvent=t.handleEvent or function() end;t.getSize=function() return {w=100,h=40} end;return t end
 package.preload['ui/widget/container/widgetcontainer']=function() return {extend=function(_,t) return t end} end
@@ -27,13 +27,13 @@ package.preload['english_popup']=function() return {show=function(o) popups[#pop
 local bars,confirms={},{}
 package.preload['english_ielts_bars']=function() return {
   overlay=function(o) local h={o=o}
-    function h:update(n) assert(not self.closed,'update after close');self.o=n end
+    function h:update(n) assert(not self.closed,'update after close');self.o=n;self.updates=(self.updates or 0)+1 end
     function h:heights() return 48,48 end
     function h:close() self.closed=true end
     bars[#bars+1]=h;return h end,
   confirmFinish=function(on_yes) confirms[#confirms+1]=on_yes end} end
 local function live() local b=bars[#bars];return b and not b.closed and b or nil end
-local function margins(r) local k=0 for _,e in ipairs(r.events) do if e.handler=='onSetPageTopMargin' or e.handler=='onSetPageBottomMargin' then k=k+1 end end return k end
+local function margins(r) local k=0 for _,e in ipairs(r.events) do if e.handler:find('Margin') then assert(e.handler=='onSetPageTopAndBottomMargin','one combined margin event');k=k+1 end end return k end
 local Preview=assert(loadfile(arg[1]..'/main.lua'))()
 
 local function walk(x,fn,seen) seen=seen or {}
@@ -87,8 +87,7 @@ local function reader(content)
   r.events={}
   local typeset={unscaled_margins={10,15,10,20},configurable={t_page_margin=15,b_page_margin=20}}
   r.ui={menu={registerToMainMenu=function() end},typeset=typeset,handleEvent=function(_,e) r.events[#r.events+1]=e;if r.boom then error('boom') end
-    if e.handler=='onSetPageTopMargin' then typeset.unscaled_margins[2]=e.args[1] end
-    if e.handler=='onSetPageBottomMargin' then typeset.unscaled_margins[4]=e.args[1] end
+    if e.handler=='onSetPageTopAndBottomMargin' then typeset.unscaled_margins[2],typeset.unscaled_margins[4]=e.args[1][1],e.args[1][2] end
     return true end,highlight=highlight,document=doc,doc_settings=r.store,
     dictionary={addToDictButtons=function() end},view={footer=footer},
     link={addCurrentLocationToStack=function() r.stacked=(r.stacked or 0)+1 end}}
@@ -131,7 +130,7 @@ local m=r.ui.typeset.unscaled_margins
 assert(m[1]==10 and m[2]==15+48 and m[3]==10 and m[4]==20+48,'bar heights added to user margins: '..table.concat(m,','))
 assert(r.ui.typeset.configurable.t_page_margin==63 and r.ui.typeset.configurable.b_page_margin==68,'margins saved with the book')
 assert(r.store.data.leaf_ielts.margins_added==true,'margins remembered')
-assert(margins(r)==2,'one top and one bottom margin event')
+assert(margins(r)==1,'one top-and-bottom margin event')
 clock=clock+65
 scheduled[#scheduled][2]()
 assert(live()==bar and bar.o.timer=='18:55','minute tick refreshes the timer: '..tostring(bar.o.timer))
@@ -145,7 +144,7 @@ bar.o.on_questions()
 assert(bar.closed and live()==nil and panels[#panels].passage==1,'Questions opens the panel, bars closed')
 panels[#panels].on_passage()
 bar=assert(live(),'back to the passage: bars again')
-assert(bar.o.tab=='passage' and margins(r)==2,'margins not added again')
+assert(bar.o.tab=='passage' and margins(r)==1,'margins not added again')
 panelBoom=true;r.plugin:showQuestions();panelBoom=false
 assert(live(),'a panel error leaves the bars up')
 -- Finish asks first; Cancel leaves the test running, Finish scores.
@@ -185,6 +184,9 @@ assert(st.session:answer(6)=="sensors' don't",'bare word: apostrophes kept like 
 n1=#panels
 live().o.on_done()
 assert(st.picking==nil and #panels==n1+1 and panels[#panels].passage and r.tapped==nil and st.session:answer(6)=="sensors' don't",'Done returns to the panel')
+panels[#panels].on_passage()
+-- Questions from English tools mid-pick ends the pick.
+panels[#panels].on_pick(5);r.plugin:showQuestions();assert(st.picking==nil,'Questions mid-pick ends the pick')
 panels[#panels].on_passage()
 -- After picking, taps look up words again.
 assert(r.tap('reluctantly')==true and r.tapped=='reluctantly')
@@ -242,9 +244,15 @@ scheduled[#scheduled][2]();assert(infos()==1,'time up shown once')
 -- Finished tests stop the clock: resume and reopen do not restart it.
 st.session:finish();st.session:pause(clock);r.plugin:onResume()
 assert(st.session.startedAt==nil,'resume after Finish must not restart the clock')
+-- Reopen: onReaderReady runs before the reader is shown, so the bars wait a tick (or the reader covers them).
+local nb,nt=#bars,#ticks
 local r2=reader(KEY);r2.store.data.leaf_ielts=r.store.data.leaf_ielts;r2.plugin:onReaderReady()
 assert(r2.plugin._ielts and r2.plugin._ielts.session.startedAt==nil,'reopen after Finish must not restart the clock')
-local b2=assert(live(),'mode already chosen: bars shown on open')
+assert(#bars==nb and #ticks==nt+1,'no bars during onReaderReady, one task scheduled')
+ticks[#ticks]()
+local b2=assert(#bars==nb+1 and live(),'mode already chosen: bars shown on the next tick')
+local r4=reader(KEY);r4.store.data.leaf_ielts=r.store.data.leaf_ielts;r4.plugin:onReaderReady();r4.plugin:onCloseDocument()
+nb=#bars;ticks[#ticks]();assert(#bars==nb,'closed before the tick: no bars')
 assert(margins(r2)==0 and r2.ui.typeset.unscaled_margins[2]==15,'margins added once across loads')
 r2.plugin:onCloseDocument()
 assert(b2.closed and r2.plugin._ielts==nil,'close closes the bars')
@@ -254,22 +262,23 @@ st.session.rec.finished=nil;st.session:start(clock)
 r.plugin:showIeltsBars()
 local b1=assert(live())
 r.plugin:onSuspend();local e=st.session.rec.elapsed;clock=clock+500
-assert(b1.closed and live()==nil,'suspend closes the bars')
+assert(live()==b1,'suspend leaves the bars (under the screensaver)')
+nb=#bars;local nu=b1.updates or 0
 r.plugin:onResume();clock=clock+10
-local b3=assert(live(),'resume shows the bars again')
--- Suspended in pick mode: the pick form comes back.
+assert(live()==b1 and #bars==nb and b1.updates==nu+1,'resume refreshes the bars in place')
+-- Suspended in pick mode: the pick form stays.
 panels[#panels].on_pick(6)
-r.plugin:onSuspend();assert(live()==nil);r.plugin:onResume()
-assert(live() and live().o.pick==6,'resume keeps the pick form')
-live().o.on_cancel()
--- Suspended while the panel is open: no bars over it on resume.
 r.plugin:onSuspend();r.plugin:onResume()
-assert(live()==nil,'no bars over the questions panel after resume')
+assert(live()==b1 and b1.o.pick==6 and #bars==nb,'resume keeps the pick form')
+live().o.on_cancel()
+-- Suspended while the panel is open: resume creates no bars.
+r.plugin:onSuspend();r.plugin:onResume()
+assert(live()==nil and #bars==nb,'no bars over the questions panel after resume')
 panels[#panels].on_passage()
-b3=assert(live())
+local b3=assert(live())
 r.plugin:onCloseDocument()
 assert(b3.closed and live()==nil,'close closes the bars')
 assert(st.session.rec.elapsed==e+10,'suspended time is not counted')
 assert(#r.added==0 and r.plugin._ielts==nil and unscheduled>0,'close cleans up')
 assert(r.footer:TapFooter()=='native','footer tap native after close')
-print('PASS: time-up message once, suspend/resume/close keep elapsed, close/suspend bars, margins once')
+print('PASS: time-up message once, suspend/resume/close keep elapsed, bars kept over suspend and refreshed on resume, margins once')

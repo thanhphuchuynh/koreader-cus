@@ -177,14 +177,15 @@ end
 
 function Preview:onSuspend()
     if self._speech then self._speech:stop() end
-    if self._ielts then self._ielts.session:pause(os.time());self:hideIeltsBars() end
+    if self._ielts then self._ielts.session:pause(os.time()) end -- bars stay, under the screensaver
 end
 
 function Preview:onResume()
     local st=self._ielts
     if not st then return end
     if not st.session:finished() then st.session:start(os.time()) end
-    if not st.in_panel then self:showIeltsBars() end
+    -- Refresh in place only: the screensaver may still be up (tap/delay to close), bars must not cover it.
+    if st.bars then self:showIeltsBars() end
 end
 
 -- IELTS Reading: a test EPUB carries META-INF/leaf-ielts.json. Any failure leaves the book as a normal book.
@@ -204,7 +205,9 @@ function Preview:loadIelts()
         if not session:finished() then session:start(os.time()) end
         UIManager:scheduleIn(60,st.tick)
         logger.info('Leaf: ielts test',test.total,'questions, mode',session:mode() or 'unset')
-        if session:mode() then self:showIeltsBars() else self:askIeltsMode() end
+        -- onReaderReady runs before the reader is shown; bars shown now would end up under it.
+        if session:mode() then UIManager:nextTick(function() if self._ielts==st then self:showIeltsBars() end end)
+        else self:askIeltsMode() end
         -- Review: after the reader is on screen, or its first paint covers the panel.
         if review and review==self.ui.document.file and session:finished() then
             UIManager:scheduleIn(0.5,function() if self._ielts==st then self:showQuestions() end end)
@@ -249,7 +252,6 @@ end
 function Preview:showIeltsBars()
     local st=self._ielts
     if not st then return end
-    st.in_panel=nil
     local ok,err=pcall(function()
         if st.bars then st.bars:update(self:ieltsBarOptions());return end
         st.bars=require('english_ielts_bars').overlay(self:ieltsBarOptions())
@@ -272,8 +274,7 @@ function Preview:ieltsMargins(top_h,bottom_h)
     local function unscaled(px) return math.ceil(px*100/Screen:scaleBySize(100)) end
     local t=ts.unscaled_margins[2]+unscaled(top_h)
     local b=ts.unscaled_margins[4]+unscaled(bottom_h)
-    self.ui:handleEvent(Event:new('SetPageTopMargin',t))
-    self.ui:handleEvent(Event:new('SetPageBottomMargin',b))
+    self.ui:handleEvent(Event:new('SetPageTopAndBottomMargin',{t,b}))
     if ts.configurable then ts.configurable.t_page_margin,ts.configurable.b_page_margin=t,b end
     st.session:setMarginsAdded()
     logger.info('Leaf: ielts margins',t,b)
@@ -331,7 +332,8 @@ function Preview:showQuestions(n,offset)
     local ok,p=pcall(function() return n and I.passageOf(st.test,n) end)
     local passage=ok and p and p.n or self:ieltsChapter()
     logger.info('Leaf: ielts panel passage',passage)
-    self:hideIeltsBars();st.in_panel=true
+    self:ieltsPickEnd() -- English tools → Questions mid-pick
+    self:hideIeltsBars()
     -- Bars, English tools and returns from pick/evidence all land here: a bad test file must not crash the reader.
     local ok,e=pcall(require('english_ielts_panel').show,{test=st.test,session=st.session,passage=passage,offset=offset,
         results=st.session:finished(),now=os.time,

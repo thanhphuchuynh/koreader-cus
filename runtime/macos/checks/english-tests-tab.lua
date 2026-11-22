@@ -4,7 +4,7 @@ local f=assert(io.open(arg[1]..'/../../../../ielts-sample.json'));local KEY=f:re
 local shown,closed,soon={},{},{}
 local function runSoon() local q=soon;soon={};for _,fn in ipairs(q) do fn() end end
 local UI={show=function(_,w) shown[#shown+1]=w end,close=function(_,w) closed[#closed+1]=w end,
-  scheduleIn=function(_,t,fn) if t<60 then soon[#soon+1]=fn end end,unschedule=function() end,setDirty=function() end}
+  scheduleIn=function(_,t,fn) if t<60 then soon[#soon+1]=fn end end,nextTick=function(_,fn) soon[#soon+1]=fn end,unschedule=function() end,setDirty=function() end}
 local Widget={};function Widget:new(t) t=t or {};t.handleEvent=t.handleEvent or function() end;t.getSize=function() return {w=100,h=40} end;return t end
 package.preload['ui/widget/container/widgetcontainer']=function() return {extend=function(_,t) return t end} end
 package.preload['ui/uimanager']=function() return UI end
@@ -120,7 +120,7 @@ assert(#panels==0,'opening a finished test normally shows no results')
 A.review('/b/IELTS/t3.epub')
 assert(opened[#opened]=='/b/IELTS/t3.epub','review opens the test')
 local rp=reader('/b/IELTS/t3.epub',done)
-assert(#panels==0 and #soon==1,'review results deferred until the reader is on screen')
+assert(#panels==0 and #soon==2,'bars and review results deferred until the reader is on screen')
 runSoon()
 assert(#panels==1 and panels[1].results==true,'review shows results')
 runSoon();assert(#panels==1,'fires once')

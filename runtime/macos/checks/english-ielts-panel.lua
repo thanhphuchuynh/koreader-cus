@@ -12,7 +12,7 @@ function Scroll:new(t) t=t or {};t.off={x=0,y=0};function t:getScrolledOffset() 
 local lastScroll
 package.preload['ui/uimanager']=function() return UI end
 package.preload['device']=function() return {screen={getWidth=function() return 600 end,getHeight=function() return 800 end,scaleBySize=function(_,s) return s end}} end
-for _,n in ipairs({'container/inputcontainer','container/framecontainer','button','horizontalgroup','verticalgroup','verticalspan','textboxwidget','textwidget','buttontable'}) do
+for _,n in ipairs({'container/inputcontainer','container/framecontainer','container/leftcontainer','button','horizontalgroup','verticalgroup','verticalspan','textboxwidget','textwidget','buttontable'}) do
   package.preload['ui/widget/'..n]=function() return Widget end
 end
 package.preload['ui/font']=function() return {getFace=function() return {} end} end
@@ -82,6 +82,8 @@ assert(n1+n2<=14 and dt:find('0/40',1,true),'dots for the passage only + x/40: '
 local Bars=require('english_ielts_bars')
 local topf=shown[#shown][1][1][1]
 assert(topf.height==Bars.height(),'top bar height')
+assert(shown[#shown][1].width==600 and shown[#shown][1].height==800,'panel frame fills the screen')
+local dotsRow=shown[#shown][1][1][2];assert(dotsRow.dimen and dotsRow.dimen.h==30 and dotsRow.dimen.w==600,'dots row has a fixed height')
 local function timer(w) return walk(w,function(t) return type(t.text)=='string' and t.text:match('^%d%d:%d%d$') end) end
 assert(not timer(shown[#shown]),'study: no timer')
 local s7=S.new(test,store());s7:setMode('practice');s7:start(0)
