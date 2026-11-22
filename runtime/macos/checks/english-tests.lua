@@ -7,9 +7,10 @@ local one=J.encode{version=1,title='Alpha',minutes=20,passages={{n=1,from=1,to=6
 local three=J.encode{version=1,title='Beta',minutes=60,passages={{n=1,from=1,to=13},{n=2,from=14,to=26},{n=3,from=27,to=40}},questions=qs(40)}
 local files={['/t/a.epub']=one,['/t/b.epub']=three,['/t/bad.epub']='{',['/t/nil.epub']=false,['/t/err.epub']='ERR'}
 local recs,mt={},{}
+reads=0
 local io_={list=function() return {'/t/a.epub','/t/b.epub','/t/bad.epub','/t/nil.epub','/t/err.epub'} end,
  stat=function(p) return {size=#(files[p] or ''),mtime=1} end,
- readJson=function(p) if files[p]=='ERR' then error('boom') end return files[p] or nil end,
+ readJson=function(p) reads=reads+1 if files[p]=='ERR' then error('boom') end return files[p] or nil end,
  record=function(p) return recs[p] end,recordMtime=function(p) return mt[p] end}
 local function by(items,t) for _,i in ipairs(items) do if i.title==t then return i end end end
 local it=T.scan('/t',io_,0);assert(#it==2,'bad/nil/erroring files skipped')
@@ -28,4 +29,7 @@ local s=T.summary(it);assert(s.count==2 and s.finished==1 and s.lastBand==bd)
 assert(T.continueItem(it)==b);recs['/t/b.epub']=nil;assert(T.continueItem(T.scan('/t',io_,0))==nil)
 recs['/t/b.epub']={answers={},elapsed=0};local o=T.ordered(T.scan('/t',io_,0))
 assert(o[1].title=='Beta' and o[2].title=='Alpha' and T.summary({}).lastBand==nil)
+local r0=reads;T.scan('/t',io_,0);assert(reads==r0,'cache hit: no re-read')
+local st0=io_.stat;io_.stat=function(p) local x=st0(p);x.mtime=2;return x end;T.scan('/t',io_,0);assert(reads>r0,'changed mtime re-reads');io_.stat=st0
+assert(#T.scan('/nope',{list=function() error('no dir') end},0)==0)
 print('PASS: tests tab scan, status, summary, continue, ordering')

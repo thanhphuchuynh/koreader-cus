@@ -34,7 +34,8 @@ end
 
 function M.scan(dir,io)
   local items={}
-  for _,path in ipairs(io.list(dir)) do
+  local ok,paths=pcall(io.list,dir)
+  for _,path in ipairs(ok and type(paths)=='table' and paths or {}) do
     local t=load(path,io)
     if t then items[#items+1]=item(path,t,io) end
   end
@@ -69,6 +70,7 @@ function M.defaultIO()
   return {
     list=function(dir)
       local out={}
+      if lfs.attributes(dir,'mode')~='directory' then return out end
       for f in lfs.dir(dir) do if f:lower():match('%.epub$') then out[#out+1]=dir..'/'..f end end
       return out
     end,
