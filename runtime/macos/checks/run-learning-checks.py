@@ -17,6 +17,7 @@ if (checks/'english-ielts.lua').exists():cases.append(('english-ielts.lua',plugi
 if (checks/'english-ielts-panel.lua').exists():cases.append(('english-ielts-panel.lua',plugin))
 if (checks/'english-ielts-reader.lua').exists():cases.append(('english-ielts-reader.lua',plugin))
 if (checks/'english-phrases.lua').exists():cases.append(('english-phrases.lua',plugin))
+if (checks/'english-tests.lua').exists():cases.append(('english-tests.lua',plugin))
 cases.append(('simpleui-ai-settings.lua',plugin.parent/'simpleui.koplugin/screens/sui_settings_window.lua'))
 for name,arg in cases:
  with tempfile.TemporaryDirectory(prefix='kindle-learning-') as directory:
