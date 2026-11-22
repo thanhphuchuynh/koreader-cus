@@ -24,16 +24,16 @@ local function row(w,items,extra,parent)
   local _,_,bh=dims()
   local frame=Frame:new{padding=0,margin=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,width=w,height=bh}
   local g=HGroup:new{align='center'}
-  local lw=extra and extra.label and math.floor(w*0.4) or 0
+  local lw=extra and extra.label and (extra.labelw or math.floor(w*0.4)) or 0
   local function cell(text,cw) return Center:new{dimen=Geom:new{w=cw,h=bh},TextWidget:new{text=text,face=Font:getFace('cfont',18),max_width=cw}} end
   if lw>0 then g[#g+1]=cell(extra.label,lw) end
   local tw=extra and extra.timer and math.floor(w*0.25) or 0
-  local bw=math.floor((w-lw-tw)/#items)
+  local bw=math.floor((w-lw-tw)/math.max(1,#items))
   for i,b in ipairs(items) do
     local last=i==#items and w-lw-tw-bw*(#items-1) or bw -- last button takes the rounding remainder
     g[#g+1]=Button:new{text=b.text,callback=b.callback,preselect=b.selected,width=last,height=bh-2,padding_v=0,margin=0,bordersize=1,show_parent=parent}
   end
-  if tw>0 then g[#g+1]=cell(extra.timer,tw) end
+  if tw>0 then local c=cell(extra.timer,tw);frame.timer_text=c[1];g[#g+1]=c end -- kept so the timer can change in place
   frame[1]=g
   return frame
 end
@@ -45,11 +45,16 @@ function M.top(w,o,parent)
     return row(w,{{text='Done',callback=call(o.on_done)},{text='Cancel',callback=call(o.on_cancel)}},
       {label=('Tap the word for Q%d'):format(o.pick)},parent)
   end
-  return row(w,{{text='Passage',selected=o.tab=='passage',callback=call(o.on_passage)},
+  if o.title then -- listening: title + optional timer, no tabs
+    local tw=o.timer and math.floor(w*0.25) or 0
+    return row(w,{},{label=o.title,labelw=w-tw,timer=o.timer},parent)
+  end
+  return row(w,{{text=o.passage_label or 'Passage',selected=o.tab=='passage',callback=call(o.on_passage)},
     {text='Questions',selected=o.tab=='questions',callback=call(o.on_questions)}},{timer=o.timer},parent)
 end
 
 function M.bottom(w,o,parent)
+  if o.view=='listening' then return row(w,{{text='Finish',callback=call(o.on_finish)}},nil,parent) end
   local first=o.view=='questions' and {text='← Passage',callback=call(o.on_passage)} or {text='Questions →',callback=call(o.on_questions)}
   return row(w,{first,{text='Finish',callback=call(o.on_finish)}},nil,parent)
 end

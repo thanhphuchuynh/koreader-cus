@@ -61,6 +61,15 @@ for _,r in ipairs({B.top(600,{tab='passage',timer='12:34'}),B.top(600,{tab='pass
   assert(sum==600,'row must fill the width: '..sum)
 end
 assert(#B.top(600,{pick=3})[1]==3,'pick form: label + Done + Cancel, no timer cell')
+-- listening forms
+t=B.top(600,{title='Section 1',timer='28:40'})
+assert(has(t,'Section 1') and has(t,'28:40') and not btn(t,'Passage') and not btn(t,'Questions') and #t[1]==2,'title form: title + timer, no tabs')
+assert(t.timer_text and t.timer_text.text=='28:40','timer widget kept for in-place updates')
+local sum=0;for _,x in ipairs(t[1]) do sum=sum+(x.width or x.dimen.w) end;assert(sum==600,'title row fills width: '..sum)
+t=B.top(600,{title='Section 1'});assert(#t[1]==1 and t[1][1].dimen.w==600 and not t.timer_text,'title only')
+b=B.bottom(600,{view='listening',on_finish=function() f=f+1 end})
+assert(btn(b,'Finish') and not btn(b,'← Passage') and not btn(b,'Questions →') and #b[1]==1);call(b,'Finish')
+t=B.top(600,{tab='passage',passage_label='Transcript'});assert(btn(t,'Transcript') and not btn(t,'Passage'),'passage_label')
 -- confirmFinish
 local yes=false
 B.confirmFinish(function() yes=true end)

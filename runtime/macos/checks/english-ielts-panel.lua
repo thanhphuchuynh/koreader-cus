@@ -4,9 +4,12 @@ local I=require('english_ielts')
 local f=assert(io.open(arg[1]..'/../../../../ielts-sample.json'));local raw=f:read('*a');f:close()
 local shown={}
 local modes={}
-local UI={show=function(_,w,mode) shown[#shown+1]=w;modes[#modes+1]=mode end,close=function() end}
+local dialogs,dirty,sched,unsched={},{},{},{}
+local UI={show=function(_,w,mode) if w.is_dialog then dialogs[#dialogs+1]=w else shown[#shown+1]=w;modes[#modes+1]=mode end end,close=function() end,
+  setDirty=function(_,w,mode,r) dirty[#dirty+1]={w,mode,r} end,
+  scheduleIn=function(_,sec,fn) sched[#sched+1]={sec,fn} end,unschedule=function(_,fn) unsched[#unsched+1]=fn end}
 local Widget={}
-function Widget:new(t) return t or {} end
+function Widget:new(t) t=t or {};t.setText=function(self,x) self.text=x end;return t end
 local Scroll={}
 function Scroll:new(t) t=t or {};t.off={x=0,y=0};function t:getScrolledOffset() return self.off end;function t:setScrolledOffset(o) self.off=o end;return t end
 local lastScroll
@@ -20,6 +23,8 @@ package.preload['ffi/blitbuffer']=function() return {COLOR_WHITE=255} end
 package.preload['ui/geometry']=function() return Widget end
 package.preload['ui/widget/container/scrollablecontainer']=function() return Scroll end
 local boxes={}
+package.preload['ui/widget/inputdialog']=function() return {new=function(_,t)
+  t.is_dialog=true;t.getInputText=function() return t.typed end;t.onShowKeyboard=function() t.kb=true end;return t end} end
 package.preload['ui/widget/confirmbox']=function() return {new=function(_,t) boxes[#boxes+1]=t;return t end} end
 local P=require('english_ielts_panel')
 local fin
@@ -130,4 +135,58 @@ local g5={version=1,minutes=20,passages={{n=1,from=14,to=14}},questions={{n=14,t
 local t5=assert(I.parse(J.encode(g5)))
 P.show({test=t5,session=S.new(t5,store()),on_pick=function()end,on_evidence=function()end,on_passage=function()end})
 assert(has('later'))
+-- Listening form
+local Ls={version=1,skill='listening',title='Section 1',audio={file='a.pcm',rate=16000,seconds=340},
+  questions={{n=1,type='gap',words=2,before='Wanted:',after='today',answer='reporter',at={85,90}},
+    {n=2,type='gap',words=1,answer='x'},{n=3,type='choice',options={'A','B'},answer='A',at={100,110}}}}
+local lt=assert(I.parse(J.encode(Ls)))
+local calls,pos,playing={},192,true
+local audio={play=function(_,a,b) calls[#calls+1]={'play',a,b};playing=true;return true end,
+  pause=function() calls[#calls+1]={'pause'};playing=false;return pos end,stop=function() end,
+  position=function() return pos end,isPlaying=function() return playing end}
+local left,heard=1720,nil
+local ls=S.new(lt,store());ls:setMode('practice')
+local lo={test=lt,session=ls,audio=audio,now=function() return 0 end,exam_left=function() return left end,
+  on_pick=function() error('listening gaps use the keyboard') end,on_hear=function(q) heard=q end,on_evidence=function(q) evidence=q end,on_passage=function() done=true end}
+local function count(pat) local c=0;walk(shown[#shown],function(t) if type(t.text)=='string' and t.text:find(pat,1,true)==1 and t.callback then c=c+1 end end);return c end
+P.show(lo)
+assert(has('Section 1') and has('28:40') and has('▶ 03:12 / 05:40 · plays once') and button('Finish'),'exam: title, countdown, audio row')
+assert(not button('Passage') and not button('Questions') and not button('← Passage') and not button('−10s') and count('↺')==0,'exam: no tabs, no controls, no replay')
+ls:setMode('study');P.show(lo)
+assert(button('−10s') and button('❚❚') and has('03:12 / 05:40') and not has('plays once') and not timer(shown[#shown]),'study row')
+assert(count('↺')==2 and button('↺ 1:25') and button('↺ 1:40'),'replay only for questions with at')
+button('−10s')();assert(calls[#calls][1]=='play' and calls[#calls][2]==182)
+pos=5;button('−10s')();assert(calls[#calls][2]==0,'−10s clamps at 0');pos=192
+button('❚❚')();assert(calls[#calls][1]=='pause' and button('▶') and not button('❚❚'),'toggle pauses and relabels')
+button('▶')();assert(calls[#calls][1]=='play' and calls[#calls][2]==192 and button('❚❚'),'toggle resumes from position')
+button('↺ 1:25')();assert(calls[#calls][1]=='play' and calls[#calls][2]==85)
+-- gap → keyboard dialog
+local ns=#shown;local lastClose
+UI.close=function(_,w) lastClose=w end
+button('1  Wanted: ____ today')()
+local dlg=dialogs[#dialogs]
+assert(dlg.title=='Q1 · up to 2 words' and dlg.input=='' and dlg.kb and #shown==ns,'gap opens keyboard dialog, no redraw yet')
+local function dbtn(l) for _,r in ipairs(dlg.buttons) do for _,b in ipairs(r) do if b.text==l then return b.callback end end end end
+dlg.typed='  cub reporter ';dbtn('Cancel')();assert(ls:answer(1)==nil and lastClose==dlg and #shown==ns,'Cancel saves nothing')
+dbtn('Save')();assert(ls:answer(1)=='cub reporter' and #shown==ns+1 and has('cub reporter'),'Save stores, closes dialog, redraws')
+ls:setAnswer(2,'x');P.show(lo)
+button('2  x')();assert(dialogs[#dialogs].title=='Q2 · up to 1 word' and dialogs[#dialogs].input=='x','singular title, current answer prefilled')
+-- 10 s tick: in place, never closes or reopens the panel
+ls:setMode('practice');P.show(lo)
+local w=shown[#shown];local tick=sched[#sched]
+assert(tick[1]==10,'tick every 10 s')
+pos,left=200,1710;ns=#shown;local nsched,ncl=#sched,0
+UI.close=function() ncl=ncl+1 end
+tick[2]()
+assert(#shown==ns and ncl==0 and shown[#shown]==w,'tick must not redraw the panel')
+assert(has('03:20 / 05:40') and has('28:30') and not has('28:40'),'row and timer updated in place')
+assert(dirty[#dirty][1]==w and dirty[#dirty][2]=='ui' and dirty[#dirty][3].h<800,'dirty region is the audio row, not the screen')
+assert(#sched==nsched+1 and sched[#sched][1]==10,'tick reschedules')
+w:onCloseWidget();assert(unsched[#unsched]==sched[#sched][2] or unsched[#unsched]==tick[2],'closing unschedules the tick')
+-- results
+UI.close=function(_,x,m) closedW=x;closedMode=m end
+button('Finish')();boxes[#boxes].ok_callback()
+assert(has('Band ≈') and count('▶ Hear it')==2 and count('Transcript')==3 and not button('Show in passage'),'listening results buttons')
+local hb=walk(shown[#shown],function(t) return t.text=='▶ Hear it' and t.callback end);hb.callback();assert(heard==lt.byNumber[1] and closedW~=shown[#shown],'Hear it plays, panel stays')
+local tb=walk(shown[#shown],function(t) return t.text=='Transcript' and t.callback end);tb.callback();assert(evidence==lt.byNumber[1] and closedMode=='full')
 print('PASS: ielts panel, selection, multi cap, blanks, passage switch, results')
