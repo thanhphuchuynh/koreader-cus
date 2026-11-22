@@ -214,7 +214,10 @@ function Preview:loadIelts()
         UIManager:scheduleIn(60,st.tick)
         logger.info('Leaf: ielts test',test.total,'questions, mode',session:mode() or 'unset')
         if not session:mode() then self:askIeltsMode() end
-        if review and review==self.ui.document.file and session:finished() then self:showQuestions() end
+        -- Review: after the reader is on screen, or its first paint covers the panel.
+        if review and review==self.ui.document.file and session:finished() then
+            UIManager:scheduleIn(0.5,function() if self._ielts==st then self:showQuestions() end end)
+        end
     end)
     if not ok then logger.info('Leaf: ielts error',err);self:closeIelts() end
 end
