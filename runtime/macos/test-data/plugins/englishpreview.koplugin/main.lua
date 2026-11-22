@@ -141,7 +141,8 @@ function Preview:getSpeech()
         isSpeaking=function() return voca:isSpeaking() or native:isSpeaking() end,
         stop=function() voca:stop(); native:stop() end,
         -- started(): audio is playing (voca reports it after generating the voice).
-        speak=function(_, text, done, started)
+        -- progress(pct): estimated Loading % while voca generates (built-in speech has none).
+        speak=function(_, text, done, started, progress)
             local function native_speak()
                 local ok, err = native:speak(text, done)
                 if ok and started then started() end
@@ -155,7 +156,7 @@ function Preview:getSpeech()
                     err = native_err or err
                 end
                 if done then done(err) end
-            end, started)
+            end, started, progress)
         end,
     }
     return self._speech

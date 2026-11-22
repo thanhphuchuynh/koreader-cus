@@ -255,14 +255,15 @@ settings_menu.english_ai_settings.callback()
 assert(opened==1,'Library Settings must open the same AI configuration form')
 print('PASS: AI settings registered in native Settings with no book or dictionary required')
 local spoken,done,stops=nil,nil,0
-local audible
-local speaker={available=function()return true end,speak=function(_,text,callback,started)spoken=text;done=callback;audible=started;return true end,
+local audible,progress
+local speaker={available=function()return true end,speak=function(_,text,callback,started,prog)spoken=text;done=callback;audible=started;progress=prog;return true end,
  stop=function()stops=stops+1;if done then local cb=done;done=nil;cb()end end}
 local listening=require('english_popup').show{title='Translation',text='Bản dịch',speech=speaker,speech_text='Read the original English.',buttons=function()return {{{text='More'}}}end}
 local listen=find(listening,'Listen')
 assert(listen,'translation popup must expose Listen')
 listen.callback()
 assert(spoken=='Read the original English.' and listen.text=='Loading…','while the voice is generated, Listen shows Loading…')
+progress(42);assert(listen.text=='Loading 42%','estimated progress shows on the button')
 listen.callback()
 assert(stops==1 and listen.text=='Listen','tapping Loading… cancels')
 listen.callback();audible()

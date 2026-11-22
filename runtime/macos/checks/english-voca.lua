@@ -20,6 +20,11 @@ local header='RIFF'..('\0'):rep(4)..'WAVEfmt '..string.char(16,0,0,0,1,0,1,0,0xC
 local pcm,rate,channels,seconds=V.pcm(header..'abcd')
 assert(rate==24000 and channels==1 and #pcm==12000*2+4+24000*2 and pcm:sub(24001,24004)=='abcd' and seconds==4/48000)
 assert(not V.pcm('nope') and not V.pcm(header:sub(1,20)..string.char(3,0)..header:sub(23)..'ab'),'non-PCM input must be rejected')
+local m={base=6,per=0.08}
+assert(V.percent(0,100,m)==0 and V.percent(7,100,m)==50 and V.percent(99,100,m)==99,'percent = elapsed / (base + per*chars), capped at 99')
+local short=V.learn(m,10,10);assert(short.base==8 and short.per==0.08,'short text learns the fixed cost')
+local long=V.learn(m,200,26);assert(long.base==6 and math.abs(long.per-0.09)<1e-9,'long text learns the per-character cost')
+print('PASS: Loading % estimate and learning')
 print('PASS: WAV converts to frame-aligned raw PCM with lead-in and tail silence; bad input rejected')
 
 local bin=os.tmpname();os.remove(bin);os.execute('mkdir -p '..bin)
@@ -42,6 +47,16 @@ assert(speech:isSpeaking())
 assert(run(200),'speech must finish')
 assert(done==1 and not err and not speech:isSpeaking(),tostring(err))
 assert(began==1,'playback start must be reported once')
+-- Loading %: a slow voca (0.5 s) and a slow clock (2 s per reading) make every poll report.
+local slow=os.tmpname();os.remove(slow);os.execute('mkdir -p '..slow..'/voca && ln -s '..plugin..'/voca/data '..slow..'/voca/data')
+local sv=io.open(slow..'/voca/voca','w');sv:write('#!/bin/sh\nsleep 0.5\nexec '..plugin..'/voca/voca "$@"\n');sv:close()
+os.execute('chmod +x '..slow..'/voca/voca')
+local clock,now=0,V.now;V.now=function()clock=clock+2;return clock end
+local pcts={}
+assert(V.new(slow):speak('Progress please.',function()end,nil,function(p)pcts[#pcts+1]=p end))
+assert(run(200));V.now=now;os.execute('rm -rf '..slow)
+assert(#pcts>=1 and pcts[#pcts]<100,'progress must be reported while generating: '..#pcts)
+for i=2,#pcts do assert(pcts[i]>=pcts[i-1]) end
 for _,c in ipairs(commands)do assert(not c:find('leaf-pwned',1,true),'text must never reach the shell') end
 assert(not io.open('/tmp/leaf-pwned'),'text must never be executed')
 local args=io.open(log):read('*a')

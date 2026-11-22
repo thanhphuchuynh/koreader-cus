@@ -53,9 +53,9 @@ function M.show(options)
  if options.speech and options.speech_text then
   local listen={id='english_speech',text='Listen',font_bold=false,enabled=options.speech:available()}
   -- Listen -> Loading… (voice being generated) -> Stop (audio playing). Tap cancels either.
-  local audible=false
+  local audible,pct=false,nil
   local function update()
-   listen.text=not speech_started and 'Listen' or audible and 'Stop' or 'Loading…'
+   listen.text=not speech_started and 'Listen' or audible and 'Stop' or pct and ('Loading '..pct..'%') or 'Loading…'
    local button=buttons and buttons.button_by_id and buttons.button_by_id.english_speech
    if not closed and button then
     button:setText(listen.text,button.width)
@@ -65,7 +65,7 @@ function M.show(options)
   listen.callback=function()
    if closed then return end
    if speech_started then options.speech:stop();return end
-   audible=false
+   audible,pct=false,nil
    local started,err=options.speech:speak(options.speech_text,function(failure)
     speech_started=false;audible=false
     if closed then return end
@@ -74,6 +74,9 @@ function M.show(options)
    end,function()
     audible=true
     if not closed and speech_started then update() end
+   end,function(p)
+    pct=p
+    if not closed and speech_started and not audible then update() end
    end)
    speech_started=started==true;update()
    if not started then UI:show(require('ui/widget/infomessage'):new{text=err or 'Speech is unavailable.'})end

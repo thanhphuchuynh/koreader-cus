@@ -22,6 +22,22 @@ function M.pcm(wav)
  return string.rep('\0',math.floor(rate/2)*frame)..wav:sub(45)..string.rep('\0',rate*frame),rate,channels,(#wav-44)/(rate*frame)
 end
 
+-- voca prints no progress, so Loading % is an estimate: seconds = base + per * characters,
+-- learned on this device after every run (Kindle is far slower than the Mac).
+function M.percent(elapsed,chars,model)
+ return math.max(0,math.min(99,math.floor(100*elapsed/(model.base+model.per*chars))))
+end
+function M.learn(model,chars,elapsed)
+ local m={base=model.base,per=model.per}
+ if chars<40 then m.base=(m.base+elapsed)/2 else m.per=(m.per+math.max(0,elapsed-m.base)/chars)/2 end
+ return m
+end
+M.now=function()
+ local ok,util=pcall(require,'ffi/util')
+ if ok and util.gettime then local s,us=util.gettime();return s+us/1e6 end
+ return os.time()
+end
+
 function M.new(dir)
  local Device=require('device')
  local UI=require('ui/uimanager')
@@ -56,13 +72,14 @@ function M.new(dir)
   if callback then callback(err) end
  end
  -- Calls next() when the current process exits; kills it after the deadline.
- local function wait(deadline,next,my)
+ local function wait(deadline,next,my,tick)
   poll=function()
    poll=nil
    if my~=generation then return end
    if alive(pid) then
+    if tick then tick() end
     if os.time()>deadline then os.execute('kill '..pid..' 2>/dev/null');finish('Speech took too long and was stopped.');return end
-    return wait(deadline,next,my)
+    return wait(deadline,next,my,tick)
    end
    next()
   end
@@ -76,7 +93,7 @@ function M.new(dir)
   if pid then os.execute('kill '..pid..' 2>/dev/null') end
   finish(nil)
  end
- function self:speak(text,on_done,on_start)
+ function self:speak(text,on_done,on_start,on_progress)
   if not self:available() then return nil,'Offline voice is not installed.' end
   if type(text)~='string' or not text:find('%S') or text:find('%z') or #text>2000 then
    return nil,'Select a short English word or passage for speech (up to 2 KB).'
@@ -92,10 +109,20 @@ function M.new(dir)
   generation=generation+1
   local my=generation
   playing=true;completion=on_done
-  wait(os.time()+60,function()
+  local settings=rawget(_G,'G_reader_settings')
+  local model=settings and settings:readSetting('leaf_voca_speed')
+   or (kindle() and {base=6,per=0.08} or {base=0.6,per=0.005})
+  local began,shown,shownAt=M.now(),nil,0
+  -- Loading %: reported at most once a second (each report is an E Ink refresh).
+  local function tick()
+   local t=M.now();local pct=M.percent(t-began,#text,model)
+   if on_progress and pct~=shown and t-shownAt>=1 then shown,shownAt=pct,t;on_progress(pct) end
+  end
+  wait(os.time()+math.max(60,math.ceil(3*(model.base+model.per*#text))),function()
    local w=io.open(wav,'rb');local bytes=w and w:read('*a');if w then w:close() end
    local pcm,rate,channels,seconds=M.pcm(bytes)
    if not pcm then finish('Could not generate speech.');return end
+   if settings then settings:saveSetting('leaf_voca_speed',M.learn(model,#text,M.now()-began)) end
    local command
    local how=player()
    if how=='afplay' then
@@ -117,7 +144,7 @@ function M.new(dir)
    if not pid then finish('Could not play speech.');return end
    if on_start then on_start() end
    wait(os.time()+math.ceil(seconds)+10,function()finish(nil)end,my)
-  end,my)
+  end,my,tick)
   return true
  end
  return self
