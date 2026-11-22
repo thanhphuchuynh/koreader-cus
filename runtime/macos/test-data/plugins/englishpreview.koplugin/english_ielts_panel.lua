@@ -189,7 +189,7 @@ function M.show(o)
     local function finish() Bars.confirmFinish(function() widget:closeDialog();if o.on_finish then o.on_finish() end;session:pause(now());session:finish();redraw{results=true,offset=false,refresh='full'} end) end
     if L then
       top=Bars.top(w,{title=test.title or 'Listening',timer=r and mmss(r) or nil},widget)
-      bottom=Bars.bottom(w,{view='listening',on_finish=finish},widget)
+      bottom=Bars.bottom(w,{view='listening',on_finish=finish,on_leave=function() widget:closeDialog();UI:close(widget,'full');if o.on_leave then o.on_leave() end end},widget)
     else
       top=Bars.top(w,{tab='questions',timer=r and mmss(r) or nil,on_passage=toPassage},widget)
       bottom=Bars.bottom(w,{view='questions',on_passage=toPassage,on_finish=finish},widget)

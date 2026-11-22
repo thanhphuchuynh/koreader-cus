@@ -336,6 +336,13 @@ assert(lst.panel==lp.widget,'open panel tracked')
 lr.plugin:getSpeech();speech.stops=0;lp.on_hear({at={10,20}})
 assert(lastCall(au)[1]=='play' and lastCall(au)[2]==10 and lastCall(au)[3]==21,'on_hear range')
 assert(speech.stops>0,'test audio stops speech')
+-- Audio stopped early (no Bluetooth): place kept, a message, no auto-finish
+local nshown=#shown
+au.on_fail(42)
+assert(lst.session:audioPos()==42 and #shown==nshown+1 and shown[#shown].text:find('Bluetooth',1,true) and not find120(),'early stop keeps the place and says why')
+-- Close leaves the test for Home
+local homes=0;lr.ui.onHome=function() homes=homes+1 end
+lp.on_leave();assert(homes==1,'Close goes Home')
 -- Listen during test audio stops test audio
 au.playing=true
 lr.plugin:getSpeech():speak('hello')

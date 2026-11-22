@@ -54,7 +54,7 @@ function M.top(w,o,parent)
 end
 
 function M.bottom(w,o,parent)
-  if o.view=='listening' then return row(w,{{text='Finish',callback=call(o.on_finish)}},nil,parent) end
+  if o.view=='listening' then return row(w,{{text='Close',callback=call(o.on_leave)},{text='Finish',callback=call(o.on_finish)}},nil,parent) end
   local first=o.view=='questions' and {text='← Passage',callback=call(o.on_passage)} or {text='Questions →',callback=call(o.on_questions)}
   return row(w,{first,{text='Finish',callback=call(o.on_finish)}},nil,parent)
 end

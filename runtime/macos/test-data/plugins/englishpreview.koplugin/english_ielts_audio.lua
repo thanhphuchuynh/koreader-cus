@@ -24,6 +24,9 @@ function M.new(o)
  end
  function self._pid()return pid end
  function self:isPlaying()return pid~=nil end
+ function self:positionAt(t)
+  return math.min(start+math.max(0,t-began-(o.kindle and 0.5 or 0)),limit)
+ end
  function self:position()
   if not pid then return frozen end
   -- the first 0.5 s on the Kindle is silent lead-in
@@ -72,6 +75,9 @@ function M.new(o)
    poll=nil
    if not pid then return end
    if V.alive(pid) then poll=tick;UI:scheduleIn(0.5,tick);return end
+   -- Exited well before the clip's end (no Bluetooth audio, gst error): a stop, not the end.
+   local early=M.now()-began<(limit-start)+(o.kindle and 0.5 or 0)-2
+   if early and self.on_fail then frozen=self:positionAt(M.now());pid=nil;self.on_fail(frozen);return end
    pid=nil;frozen=limit
    if self.on_end then self.on_end() end
   end

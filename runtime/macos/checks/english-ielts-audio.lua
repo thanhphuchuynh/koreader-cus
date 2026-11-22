@@ -44,6 +44,18 @@ os.remove(out);assert(a:play(99));assert(waitEnd(a));assert(read()==LEAD..blocks
 -- sub-second from/to
 os.remove(out);assert(a:play(1.5,2.2));assert(waitEnd(a));assert(read()==LEAD..blocks(150,220)..TAIL,'fractional from/to: '..read())
 
+-- gst exits long before the clip's end (no Bluetooth): on_fail with the place reached, never on_end
+do
+  local b=A.new{path=pcm,rate=rate,seconds=3,kindle=true}
+  local ends,fails,at=0,0,nil
+  b.on_end=function() ends=ends+1 end;b.on_fail=function(p) fails=fails+1;at=p end
+  os.remove(out);assert(b:play(0));assert(waitEnd(b))
+  assert(fails==1 and ends==0 and at and at<1 and b:position()==at,'early exit is a stop, not the end: '..tostring(at))
+  -- the same exit after the clip's duration has passed is the natural end
+  os.remove(out);assert(b:play(2.5));clock=clock+5;assert(waitEnd(b))
+  assert(ends==1 and fails==1,'late exit is the end')
+end
+
 -- position: nothing during the 0.5 s lead-in, then follows the clock; frozen on pause; stop keeps the stop point
 local sleeper=io.open(bin..'/gst-launch-0.10','w');sleeper:write('#!/bin/sh\nexec sleep 30\n');sleeper:close()
 ended=0

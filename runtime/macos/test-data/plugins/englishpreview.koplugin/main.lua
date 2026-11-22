@@ -329,6 +329,15 @@ function Preview:ieltsAudio(quiet)
         a[k]=function(s) local r=f(s);st.session:setAudioPos(s:position());return r end
     end
     a.on_end=function() self:ieltsAudioEnd() end
+    -- Stopped early (headphones off or still reconnecting): keep the place, never treat it as the end.
+    a.on_fail=function(pos)
+        if self._ielts~=st then return end
+        st.session:setAudioPos(pos)
+        if st.panel then st.panel:updateAudio() end
+        UIManager:show(require('ui/widget/infomessage'):new{text=st.session:mode()=='practice'
+            and 'Audio stopped. Connect Bluetooth headphones, then close and reopen the test — it continues from here.'
+            or 'Audio stopped. Connect Bluetooth headphones, then tap ▶.'})
+    end
     st.autofinish=function() self:ieltsAutoFinish() end
     return a
 end
@@ -467,7 +476,8 @@ function Preview:showQuestions(n,offset)
         end,
         on_hear=function(q) if st.audio then st.audio:play(q.at[1],q.at[2]+1) end end,
         on_finish=function() if st.audio then st.audio:stop();self:ieltsDisarm(true) end end,
-        on_retry=function() self:ieltsRetry() end})
+        on_retry=function() self:ieltsRetry() end,
+        on_leave=function() self.ui:onHome() end})
     if not ok then logger.info('Leaf: ielts error',e);self:showIeltsBars() end
 end
 
