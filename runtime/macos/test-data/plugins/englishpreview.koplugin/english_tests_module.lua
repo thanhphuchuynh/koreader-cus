@@ -7,7 +7,9 @@ M.io=nil -- checks inject a fake; default is built on first use (docsettings is 
 M.now=os.time
 function M.getMenuItems() return nil end
 
-local last -- {width, widget}: getHeight is asked right before build for the same width
+local dio
+local function defaultIO() dio=dio or Tests.defaultIO() return dio end
+local last -- {width, widget} left by getHeight for the next build
 local function build(w)
   local Screen=require('device').screen
   local VG=require('ui/widget/verticalgroup')
@@ -26,7 +28,7 @@ local function build(w)
   local function gap(n) col[#col+1]=VS:new{width=n or pad} end
   local function label(s) gap();text(s,14,'cfont',nil,Blitbuffer.COLOR_DARK_GRAY) end
   local home=G_reader_settings and G_reader_settings:readSetting('home_dir') or '/mnt/us/documents'
-  local items=Tests.scan(home..'/IELTS',M.io or Tests.defaultIO())
+  local items=Tests.scan(home..'/IELTS',M.io or defaultIO())
   if #items==0 then
     text('No tests yet — put test files in documents/IELTS')
     return col
@@ -48,7 +50,7 @@ local function build(w)
       b('Review',function(p) M.actions.review(p) end);b('Retry',function(p) M.actions.retry(p) end)
     end
     local row=HG:new{};for _,x in ipairs(buttons) do row[#row+1]=x end
-    gap(pad/2);col[#col+1]=row
+    gap(math.floor(pad/2));col[#col+1]=row
   end
   local s=Tests.summary(items)
   label('TESTS')
@@ -67,17 +69,28 @@ local function build(w)
   return col
 end
 
-local function width(ctx) return ctx and (ctx.col_w or ctx.inner_w) or require('device').screen:getWidth() end
+-- The engine builds at ModuleChrome.contentWidth(col_w, chrome), not at col_w.
+local function width(ctx)
+  local w=ctx and (ctx.col_w or ctx.inner_w) or require('device').screen:getWidth()
+  if ctx and ctx.pfx and ctx.col_w then
+    local ok,C=pcall(require,'features/sui_module_chrome')
+    if ok and C then
+      local ok2,v=pcall(function() return C.contentWidth(ctx.col_w,C.resolve(ctx.pfx,M.id)) end)
+      if ok2 and v then return v end
+    end
+  end
+  return w
+end
 
+-- getHeight builds and keeps the widget; the build that follows for the same width takes it (once), so data is never reused across renders.
 function M.build(w,ctx)
-  local x=build(w)
-  last={w,x}
-  return x
+  local l=last;last=nil
+  return l and l[1]==w and l[2] or build(w)
 end
 
 function M.getHeight(ctx)
   local w=width(ctx)
-  local x=last and last[1]==w and last[2] or build(w)
+  local x=build(w)
   last={w,x}
   return x:getSize().h
 end

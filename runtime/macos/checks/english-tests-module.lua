@@ -58,7 +58,13 @@ files['/home/IELTS/d.epub']=book('Delta',20,40,1);recs['/home/IELTS/d.epub']={mo
 widget=M.build(560,{});assert(walk(widget,function(t) return type(t.text)=='string' and t.text:find('…40',1,true) and select(2,t.text:gsub('■',''))+select(2,t.text:gsub('□',''))==13 end),'long dots')
 assert(M.getHeight({col_w=560})==widget:getSize().h,'getHeight matches build')
 -- empty
-listed={};widget=M.build(560,{})
+M.build(560,{});listed={};widget=M.build(560,{})
 assert(has('No tests yet — put test files in documents/IELTS') and not has('CONTINUE') and not has('ALL TESTS'))
 assert(M.getHeight({col_w=560})==widget:getSize().h)
+-- engine builds at the chrome-inset width; getHeight must measure at that width
+listed={'/home/IELTS/a.epub'};local calls={}
+package.preload['features/sui_module_chrome']=function() return {resolve=function(p,id) calls[#calls+1]=id return {} end,contentWidth=function(c) return c-40 end} end
+local H=M.getHeight({col_w=600,pfx='x_'});assert(calls[1]=='leaf_tests')
+local wbuilt=M.build(560,{});listed={};assert(M.getHeight({col_w=560})==20 and M.build(560,{})~=nil,'no stale cache across renders')
+listed={'/home/IELTS/a.epub'};assert(H==wbuilt:getSize().h,'getHeight at inset width '..H..' '..wbuilt:getSize().h)
 print('PASS: tests module layout, actions, empty state')
