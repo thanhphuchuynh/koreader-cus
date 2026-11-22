@@ -28,7 +28,7 @@ local function item(path,t,io)
   it.meta=('%d Q · %d min'):format(t.total,t.minutes)..(#t.passages>1 and (' · %d passages'):format(#t.passages) or '')
   if s:finished() then
     it.state='done';it.right=I.score(t,answers).right;it.band,it.rough=I.band(it.right,t.total)
-  elseif rec then it.state='progress';it.remaining=s:remaining(0)+0 end
+  elseif rec then it.state='progress';it.remaining=s:remaining(0) end
   return it
 end
 
