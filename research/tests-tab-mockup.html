@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaf Tests tab</title>
+<style>
+:root{--ink:#181818;--muted:#555;--line:#bbb;--soft:#e8e8e8;--bg:#eceeed;--paper:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,sans-serif}
+header{max-width:1240px;margin:auto;padding:22px 16px 6px}
+header h1{font:24px/1.25 Georgia,serif;margin:0 0 6px}
+header p{margin:0;color:#333;max-width:760px}
+main{max-width:1240px;margin:auto;padding:14px 16px 32px;display:flex;gap:26px;flex-wrap:wrap;justify-content:center}
+.opt{width:360px;max-width:100%}
+.opt h2{font:17px Georgia,serif;margin:0 0 2px}
+.opt .sub{font-size:13px;color:var(--muted);margin:0 0 10px;min-height:38px}
+.device{height:480px;background:var(--paper);border:1px solid #999;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.status{display:flex;justify-content:space-between;font-size:11px;padding:6px 12px 2px}
+.content{flex:1;overflow:auto;padding:6px 14px 10px}
+.tabs{display:grid;border-top:2px solid var(--ink)}
+.tabs button{border:0;background:#fff;font:12px system-ui;padding:9px 0 11px;cursor:pointer;color:inherit;border-top:3px solid transparent;margin-top:-2px}
+.tabs button.on{border-top-color:var(--ink);font-weight:700}
+.label{font:600 11px system-ui;letter-spacing:.08em;margin:10px 0 6px}
+.test{border:1px solid var(--ink);padding:9px 10px;margin:0 0 8px}
+.test h3{font:15px/1.25 Georgia,serif;margin:0 0 2px}
+.meta{font-size:11.5px;color:var(--muted)}
+.dots{display:flex;gap:3px;margin:6px 0 2px}
+.dots span{width:11px;height:11px;border:1px solid var(--ink)}
+.dots span.f{background:var(--ink)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
+.btn{border:1px solid var(--ink);background:#fff;font:12px system-ui;padding:6px 12px;cursor:pointer;color:inherit}
+.btn.primary{background:var(--ink);color:#fff}
+.score{font:20px Georgia,serif}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--ink);margin:4px 0 4px}
+.summary div{padding:7px 4px;text-align:center;border-right:1px solid var(--line)}
+.summary div:last-child{border-right:0}
+.summary b{display:block;font:18px Georgia,serif}
+.summary span{font-size:10.5px;color:var(--muted)}
+.full .top{display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--ink);padding:10px 12px;font:600 15px system-ui}
+.full .top button{border:0;background:none;font:13px system-ui;cursor:pointer;text-decoration:underline}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 10px;margin-top:6px}
+.cover{border:1px solid var(--ink);aspect-ratio:3/4;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:6px;font:11.5px/1.25 Georgia,serif;box-shadow:2px 2px 0 #bbb}
+.cover small{font:9px system-ui;color:var(--muted);margin-top:6px}
+.fname{font-size:10px;margin-top:4px;word-break:break-word}
+.path{font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);padding:4px 0 6px}
+.note{font-size:12.5px;color:#333;margin-top:10px}
+.note b{font-weight:600}
+.pill{display:inline-block;border:1px solid var(--ink);font:10px system-ui;padding:0 5px;margin-left:4px}
+.placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font:13px system-ui;text-align:center;padding:20px}
+footer{max-width:1240px;margin:auto;padding:0 16px 28px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tests tab — three ways</h1>
+  <p>Kindle size, grayscale like your SimpleUI Home. Tap the tabs in each device: watch whether the tab bar stays, and what the Tests page shows. Sample tests and scores are illustrative.</p>
+</header>
+<main>
+  <section class="opt">
+    <h2>A · Custom Screen + Leaf module <span class="pill">recommended</span></h2>
+    <p class="sub">A SimpleUI page like Home. Tab bar stays. Status, score and buttons per test.</p>
+    <div class="device" data-opt="A"></div>
+    <p class="note"><b>+</b> native look, tabs always visible, no SimpleUI code changes. <b>−</b> a bit more setup (module + screen + tab).</p>
+  </section>
+  <section class="opt">
+    <h2>B · Leaf full-screen page</h2>
+    <p class="sub">Tab opens Leaf's own page. It covers the tab bar; you leave with ← Back.</p>
+    <div class="device" data-opt="B"></div>
+    <p class="note"><b>+</b> simplest Leaf code, full freedom of layout. <b>−</b> tabs disappear on this page, unlike Home / Library / History.</p>
+  </section>
+  <section class="opt">
+    <h2>C · Folder shortcut</h2>
+    <p class="sub">Tab opens documents/IELTS in Library. Same grid as books.</p>
+    <div class="device" data-opt="C"></div>
+    <p class="note"><b>+</b> almost no code. <b>−</b> no status, score or Continue; looks like any book folder.</p>
+  </section>
+</main>
+<footer>The test-taking screen itself (passage page + Questions panel) is the same in all three.</footer>
+<script>
+'use strict';
+const tests=[
+ {t:'Night lights and sea turtles',m:'Academic · 6 Q · 20 min',state:'progress',ans:3,total:6,file:'night-lights-and-sea-turtles.epub'},
+ {t:'Bees on guard',m:'Cambridge 18 · Test 1 · Passage 1 · 13 Q',state:'done',score:'9/13',band:'6.5',file:'bees-on-guard.epub'},
+ {t:'Full test 3',m:'Academic · 3 passages · 40 Q · 60 min',state:'new',total:40,file:'full-test-3.epub'},
+];
+const TABS=['Home','Tests','Library','History','Settings'];
+const st={A:'Tests',B:'Home',C:'Tests'};
+function dots(n,f){let h='<div class="dots">';for(let i=0;i<Math.min(n,13);i++)h+=`<span class="${i<f?'f':''}"></span>`;return h+(n>13?` <span style="border:0;width:auto;font-size:10px">…${n}</span>`:'')+'</div>'}
+function card(x){
+ if(x.state==='progress')return `<div class="test"><h3>${x.t}</h3><div class="meta">${x.m}</div>${dots(x.total,x.ans)}<div class="row"><span class="meta">In progress · ${x.ans}/${x.total} answered · 12:40 left</span><button class="btn primary">Continue</button></div></div>`;
+ if(x.state==='done')return `<div class="test"><h3>${x.t}</h3><div class="meta">${x.m}</div><div class="row"><span><span class="score">${x.score}</span> <span class="meta">· Band ≈ ${x.band}</span></span><span><button class="btn">Review</button> <button class="btn">Retry</button></span></div></div>`;
+ return `<div class="test"><h3>${x.t}</h3><div class="meta">${x.m}</div><div class="row"><span class="meta">Not started</span><button class="btn primary">Start</button></div></div>`;
+}
+function testsPage(){
+ return `<div class="label">TESTS</div><div class="summary"><div><b>3</b><span>tests</span></div><div><b>1</b><span>finished</span></div><div><b>6.5</b><span>last band</span></div></div>
+ <div class="label">CONTINUE</div>${card(tests[0])}<div class="label">ALL TESTS</div>${card(tests[2])}${card(tests[1])}`;
+}
+function home(){return `<div class="label">CURRENTLY READING</div><div class="test"><h3>A Week by the Sea</h3><div class="meta">Leaf · 33%</div></div><div class="label">RECENT BOOKS</div><div class="grid"><div class="cover">Educated</div><div class="cover">Dune</div><div class="cover">Kafka bên bờ biển</div></div>`}
+function library(folder){
+ if(folder)return `<div class="path">documents / IELTS</div><div class="grid">${tests.map(x=>`<div><div class="cover">${x.t}<small>EPUB</small></div><div class="fname">${x.file}</div></div>`).join('')}</div>`;
+ return `<div class="path">documents</div><div class="grid">${['English','Tech & Business','tiengviet','truyen','IELTS'].map(f=>`<div><div class="cover" style="box-shadow:none">📁<br>${f}</div></div>`).join('')}</div>`;
+}
+function bar(o){return `<div class="tabs" style="grid-template-columns:repeat(${TABS.length},1fr)">${TABS.map(t=>`<button data-o="${o}" data-t="${t}" class="${st[o]===t?'on':''}">${t}</button>`).join('')}</div>`}
+function status(){return '<div class="status"><span>20:41</span><span>▮ 82%</span></div>'}
+function render(o){
+ const d=document.querySelector(`[data-opt="${o}"]`);const t=st[o];let body;
+ if(o==='B'&&t==='Tests'){d.innerHTML=`<div class="full" style="display:flex;flex-direction:column;height:100%"><div class="top"><button data-o="B" data-t="Home">← Back</button>Tests</div><div class="content">${testsPage()}</div></div>`;return}
+ if(t==='Home')body=home();
+ else if(t==='Tests')body=o==='C'?library(true):testsPage();
+ else if(t==='Library')body=library(false);
+ else body=`<div class="placeholder">${t}</div>`;
+ d.innerHTML=status()+`<div class="content">${body}</div>`+bar(o);
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-o]');if(!b)return;st[b.dataset.o]=b.dataset.t;render(b.dataset.o)});
+['A','B','C'].forEach(render);
+</script>
+</body>
+</html>
