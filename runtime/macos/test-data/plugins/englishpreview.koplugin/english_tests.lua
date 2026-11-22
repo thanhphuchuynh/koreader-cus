@@ -66,7 +66,6 @@ end
 
 function M.defaultIO()
   local lfs=require('libs/libkoreader-lfs')
-  local DS=require('docsettings')
   return {
     list=function(dir)
       local out={}
@@ -78,12 +77,12 @@ function M.defaultIO()
     readJson=function(p)
       local r=require('ffi/archiver').Reader:new()
       if not r:open(p) then return nil end
-      local ok,data=pcall(r.extractToMemory,r,'META-INF/leaf-ielts.json');r:close()
+      local ok,data=pcall(function() for _ in r:iterate() do end return r:extractToMemory('META-INF/leaf-ielts.json') end);r:close()
       return ok and data or nil
     end,
-    record=function(p) return DS:open(p):readSetting('leaf_ielts') end,
+    record=function(p) return require('docsettings'):open(p):readSetting('leaf_ielts') end,
     recordMtime=function(p)
-      local f=DS:findSidecarFile(p);local a=f and lfs.attributes(f)
+      local f=require('docsettings'):findSidecarFile(p);local a=f and lfs.attributes(f)
       return a and a.modification
     end,
   }

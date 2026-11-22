@@ -1,4 +1,6 @@
 package.path=assert(arg[1])..'/?.lua;'..package.path
+require('ffi/loadlib') -- KOReader's setupkoenv does this at startup; needed for ffi/archiver
+
 local J=require('json')
 local I=require('english_ielts')
 local T=require('english_tests')
@@ -32,4 +34,8 @@ assert(o[1].title=='Beta' and o[2].title=='Alpha' and T.summary({}).lastBand==ni
 local r0=reads;T.scan('/t',io_,0);assert(reads==r0,'cache hit: no re-read')
 local st0=io_.stat;io_.stat=function(p) local x=st0(p);x.mtime=2;return x end;T.scan('/t',io_,0);assert(reads>r0,'changed mtime re-reads');io_.stat=st0
 assert(#T.scan('/nope',{list=function() error('no dir') end},0)==0)
+local repo=arg[1]..'/../../../..'
+local dir=os.tmpname();os.remove(dir);os.execute('mkdir -p '..dir..' && python3 '..repo..'/make-ielts-test.py '..repo..'/ielts-sample.json '..dir)
+local real=T.scan(dir,T.defaultIO(),0);assert(#real==1 and real[1].title=='Night lights and sea turtles' and real[1].state=='new','real epub scan')
+os.execute('rm -rf '..dir)
 print('PASS: tests tab scan, status, summary, continue, ordering')
