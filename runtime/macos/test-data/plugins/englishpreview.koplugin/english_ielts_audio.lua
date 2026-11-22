@@ -30,6 +30,7 @@ function M.new(o)
   local p=start+math.max(0,M.now()-began-(o.kindle and 0.5 or 0))
   return math.min(p,limit)
  end
+ function self:seek(p)if not pid then frozen=p end end -- restore a saved position while stopped
  function self:stop()local p=self:position();halt();frozen=p end
  function self:pause()
   local p=self:position();halt();frozen=p;return p

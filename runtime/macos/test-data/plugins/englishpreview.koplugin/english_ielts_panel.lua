@@ -184,7 +184,7 @@ function M.show(o)
     -- 'full': closing with no refresh type repaints the reader but never updates the display (ghosting).
     local function toPassage() UI:close(widget,'full');o.on_passage() end
     local r=exam and (L and o.exam_left and o.exam_left() or session:remaining(now()))
-    local function finish() Bars.confirmFinish(function() session:pause(now());session:finish();redraw{results=true,offset=false,refresh='full'} end) end
+    local function finish() Bars.confirmFinish(function() if o.on_finish then o.on_finish() end;session:pause(now());session:finish();redraw{results=true,offset=false,refresh='full'} end) end
     if L then
       top=Bars.top(w,{title=test.title or 'Listening',timer=r and mmss(r) or nil},widget)
       bottom=Bars.bottom(w,{view='listening',on_finish=finish},widget)
@@ -194,7 +194,7 @@ function M.show(o)
     end
     dh=Screen:scaleBySize(30)
   end
-  if L and Bars then arow=Screen:scaleBySize(48) end
+  if L and audio and Bars then arow=Screen:scaleBySize(48) end
   local sh=Bars and h-2*Bars.height()-dh-arow or h
   local scroll=Scroll:new{dimen=Geom:new{w=w,h=sh},show_parent=widget,FrameContainer:new{padding=pad,bordersize=0,col}}
   widget._scroll=scroll;widget.cropping_widget=scroll
@@ -202,7 +202,7 @@ function M.show(o)
   local body=scroll
   if Bars then
     local audioRow
-    if L then
+    if L and audio then
       local at=test.audio.seconds
       local function clock() return mmss(audio:position())..' / '..mmss(at) end
       local g=HGroup:new{align='center'}
@@ -211,7 +211,7 @@ function M.show(o)
         g[1]=rowText
       else
         local bw=Screen:scaleBySize(80)
-        g[1]=Button:new{text='−10s',width=bw,callback=function() audio:play(math.max(0,audio:position()-10)) end,show_parent=widget}
+        g[1]=Button:new{text='−10s',width=bw,callback=function() audio:play(math.max(0,audio:position()-10));redraw() end,show_parent=widget}
         g[2]=Button:new{text=audio:isPlaying() and '❚❚' or '▶',width=bw,show_parent=widget,callback=function()
           if audio:isPlaying() then audio:pause() else audio:play(audio:position()) end
           redraw()
@@ -228,7 +228,8 @@ function M.show(o)
       end
       local function tick() widget:updateAudio();UI:scheduleIn(10,tick) end
       UI:scheduleIn(10,tick)
-      function widget:onCloseWidget() UI:unschedule(tick) end
+      function widget:onCloseWidget() UI:unschedule(tick);self._closed=true end
+      function widget:refresh() if not self._closed then redraw() end end -- audio ended by itself: label and clock
     end
     body=VerticalGroup:new{align='left',top,
       require('ui/widget/container/leftcontainer'):new{dimen=Geom:new{w=w,h=dh}, -- FrameContainer height is paint-only, not layout
@@ -239,6 +240,7 @@ function M.show(o)
   widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,width=w,height=h,body} -- white to the screen edge
   widget._col=col
   UI:show(widget,o.refresh or 'full')
+  if o.on_open then o.on_open(widget) end
   return widget
 end
 return M

@@ -38,4 +38,8 @@ local repo=arg[1]..'/../../../..'
 local dir=os.tmpname();os.remove(dir);os.execute('mkdir -p '..dir..' && python3 '..repo..'/make-ielts-test.py '..repo..'/ielts-sample.json '..dir)
 local real=T.scan(dir,T.defaultIO(),0);os.execute('rm -rf '..dir)
 assert(#real==1 and real[1].title=='Night lights and sea turtles' and real[1].state=='new','real epub scan')
+local lis=J.encode{version=1,skill='listening',title='Section 1',minutes=30,audio={file='a.pcm',rate=16000,seconds=60},questions=qs(3)}
+files['/t/l.epub']=lis
+local lio={list=function() return {'/t/l.epub'} end,stat=io_.stat,readJson=io_.readJson,record=io_.record,recordMtime=io_.recordMtime}
+local li=T.scan('/t',lio,0)[1];assert(li.meta=='Listening · 3 Q · 30 min','listening meta: '..li.meta)
 print('PASS: tests tab scan, status, summary, continue, ordering')

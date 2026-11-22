@@ -26,8 +26,8 @@ local function book(title,min,total,np) local p={} for i=1,np do p[i]={n=i,from=
   return J.encode{version=1,title=title,minutes=min,passages=p,questions=qs(total)} end
 local files={['/home/IELTS/a.epub']=book('Alpha',20,6,1),['/home/IELTS/b.epub']=book('Beta',60,13,1),['/home/IELTS/c.epub']=book('Gamma',20,13,1)}
 local recs,mt={},{}
-local listed={'/home/IELTS/a.epub','/home/IELTS/b.epub','/home/IELTS/c.epub'};local dirSeen
-M.io={list=function(d) dirSeen=d;return listed end,stat=function(p) return {size=#files[p],mtime=1} end,readJson=function(p) return files[p] end,
+local listed={'/home/IELTS/a.epub','/home/IELTS/b.epub','/home/IELTS/c.epub'};local dirs={}
+M.io={list=function(d) dirs[#dirs+1]=d;return d=='/home/IELTS' and listed or {} end,stat=function(p) return {size=#files[p],mtime=1} end,readJson=function(p) return files[p] end,
   record=function(p) return recs[p] end,recordMtime=function(p) return mt[p] or 0 end}
 local ans={};for i=1,13 do ans[i]='a'..i end
 local three={};for i=1,3 do three[i]='a'..i end
@@ -41,7 +41,7 @@ local widget
 local function has(s) return walk(widget,function(t) return t.text==s end) end
 local function hasSub(s) return walk(widget,function(t) return type(t.text)=='string' and t.text:find(s,1,true) end) end
 local function btn(l) local b=walk(widget,function(t) return t.text==l and t.callback end);assert(b,'no button '..l);return b.callback end
-widget=M.build(560,{pfx='x_'});assert(dirSeen=='/home/IELTS')
+widget=M.build(560,{pfx='x_'});assert(dirs[1]=='/home/IELTS' and dirs[2]=='/home/IELTS/Listening' and #dirs==2,'scans IELTS and IELTS/Listening')
 for _,s in ipairs{'TESTS','CONTINUE','ALL TESTS','3','1','tests','finished','last band','Alpha','Gamma · Not started','In progress · 3/6 answered · 12:40 left','Continue','Review…','Start'} do assert(has(s),'missing '..s) end
 assert(hasSub('Beta · 13/13 · Band ≈ '),'done line')
 -- one-line rows: text, span, button; row height = button height

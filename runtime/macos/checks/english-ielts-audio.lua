@@ -62,6 +62,8 @@ os.execute('sleep 0.2')
 assert(not V.alive(pid),'stop kills the player')
 assert(#jobs==0 and ended==0 and not a:isPlaying(),'stop leaves nothing scheduled and no on_end')
 
+a:seek(1.5);assert(a:position()==1.5,'seek sets the stopped position (saved position restored on reopen)')
+
 -- WAV slice (Mac path): header + PCM from offset up to `to`
 local w=A.wav(5,'0123456789',2,6)
 assert(#w==44+4 and w:sub(1,4)=='RIFF' and w:sub(9,12)=='WAVE' and w:sub(45)=='2345','wav slice bytes')

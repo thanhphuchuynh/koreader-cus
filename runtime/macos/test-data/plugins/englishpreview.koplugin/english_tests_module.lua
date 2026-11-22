@@ -65,7 +65,10 @@ local function build(w)
   end
   local function gap(n) col[#col+1]=VS:new{width=n or pad} end
   local function label(s) gap();text(s,14,'cfont',nil,Blitbuffer.COLOR_DARK_GRAY) end
-  local items=Tests.scan(homeDir()..'/IELTS',M.io or defaultIO())
+  local items={}
+  for _,sub in ipairs{'/IELTS','/IELTS/Listening'} do
+    for _,it in ipairs(Tests.scan(homeDir()..sub,M.io or defaultIO())) do items[#items+1]=it end
+  end
   if #items==0 then
     text('No tests yet — put test files in documents/IELTS')
     return col

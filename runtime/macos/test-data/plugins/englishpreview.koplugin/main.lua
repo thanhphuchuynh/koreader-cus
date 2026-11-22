@@ -143,6 +143,8 @@ function Preview:getSpeech()
         -- started(): audio is playing (voca reports it after generating the voice).
         -- progress(pct): estimated Loading % while voca generates (built-in speech has none).
         speak=function(_, text, done, started, progress)
+            local a=self._ielts and self._ielts.audio
+            if a and a:isPlaying() then a:stop() end -- one sound at a time
             local function native_speak()
                 local ok, err = native:speak(text, done)
                 if ok and started then started() end
@@ -178,7 +180,9 @@ end
 
 function Preview:onSuspend()
     if self._speech then self._speech:stop() end
-    if self._ielts then self._ielts.session:pause(os.time()) end -- bars stay, under the screensaver
+    local st=self._ielts
+    if st and st.audio then st.audio:stop() end
+    if st then st.session:pause(os.time()) end -- bars stay, under the screensaver
 end
 
 function Preview:onResume()
@@ -187,6 +191,11 @@ function Preview:onResume()
     if not st.session:finished() then st.session:start(os.time()) end
     -- Refresh in place only: the screensaver may still be up (tap/delay to close), bars must not cover it.
     if st.bars then self:showIeltsBars() end
+    local a=st.audio
+    if a and not st.session:finished() then
+        if st.session:mode()=='practice' then self:ieltsPlayOn() end
+        if st.panel and st.panel.refresh then st.panel:refresh() end -- ▶/❚❚ and clock
+    end
 end
 
 -- IELTS Reading: a test EPUB carries META-INF/leaf-ielts.json. Any failure leaves the book as a normal book.
@@ -207,7 +216,12 @@ function Preview:loadIelts()
         UIManager:scheduleIn(60,st.tick)
         logger.info('Leaf: ielts test',test.total,'questions, mode',session:mode() or 'unset')
         -- onReaderReady runs before the reader is shown; bars shown now would end up under it.
-        if session:mode() then UIManager:nextTick(function() if self._ielts==st then self:showIeltsBars() end end)
+        if test.skill=='listening' then
+            st.audio=self:ieltsAudio(session:finished())
+            if not session:finished() then
+                UIManager:nextTick(function() if self._ielts==st then self:startListening() end end)
+            else UIManager:nextTick(function() if self._ielts==st then self:showIeltsBars() end end) end
+        elseif session:mode() then UIManager:nextTick(function() if self._ielts==st then self:showIeltsBars() end end)
         else self:askIeltsMode() end
         -- Review: after the reader is on screen, or its first paint covers the panel.
         if review and review==self.ui.document.file and session:finished() then
@@ -222,8 +236,9 @@ function Preview:closeIelts()
     if not st then return end
     pcall(function()
         self:hideIeltsBars()
+        if st.audio then st.audio:stop() end
         st.session:pause(os.time())
-        UIManager:unschedule(st.tick)
+        UIManager:unschedule(st.tick);UIManager:unschedule(st.autofinish)
     end)
     self._ielts=nil
 end
@@ -244,6 +259,7 @@ function Preview:ieltsBarOptions()
         o.on_cancel=function() self:ieltsPickCancel() end
     else
         o.tab='passage'
+        if st.test.skill=='listening' then o.passage_label='Transcript' end
         local left=st.session:remaining(os.time())
         if left then o.timer=('%02d:%02d'):format(math.floor(left/60),left%60) end
     end
@@ -291,6 +307,79 @@ function Preview:ieltsFinish()
     end)
 end
 
+-- IELTS Listening: audio beside the book (nil without it). Its play/pause/stop hooks keep one sound at a
+-- time and the saved position; the audio ending hands over to ieltsAudioEnd.
+function Preview:ieltsAudio(quiet)
+    local st=self._ielts
+    local file=st.test.audio.file
+    local path=(self.ui.document.file:match('^(.*)/') or '.')..'/'..file
+    local f=io.open(path,'rb')
+    if not f then
+        if not quiet then UIManager:show(require('ui/widget/infomessage'):new{text='Audio file not found: '..file}) end
+        return nil
+    end
+    f:close()
+    local Device=require('device')
+    local a=require('english_ielts_audio').new{path=path,rate=st.test.audio.rate,seconds=st.test.audio.seconds,kindle=Device:isKindle()}
+    a:seek(st.session:audioPos())
+    local play=a.play
+    a.play=function(s,...) if self._speech then self._speech:stop() end;return play(s,...) end
+    for _,k in ipairs{'pause','stop'} do
+        local f=a[k]
+        a[k]=function(s) local r=f(s);st.session:setAudioPos(s:position());return r end
+    end
+    a.on_end=function() self:ieltsAudioEnd() end
+    st.autofinish=function() self:ieltsAutoFinish() end
+    return a
+end
+
+-- Exam: play on from the saved position, or (already past the end) just wait out the 2:00.
+function Preview:ieltsPlayOn()
+    local st=self._ielts
+    local pos=st.session:audioPos()
+    if pos<st.test.audio.seconds then st.audio:play(pos)
+    else UIManager:unschedule(st.autofinish);UIManager:scheduleIn(120,st.autofinish) end
+end
+
+function Preview:startListening()
+    local st=self._ielts
+    local session=st.session
+    local function go()
+        if not session:mode() then session:setMode('study') end -- prompt dismissed without a choice: no clock
+        self:showQuestions()
+        if st.audio and session:mode()=='practice' then self:ieltsPlayOn() end
+    end
+    if session:mode() then return go() end
+    local done=false
+    local function once() if not done then done=true;go() end end
+    require('english_popup').show{title='IELTS Listening',
+        text='Exam: the audio plays once, timed.\nStudy: pause, go back 10 s, replay a question.',
+        on_close=once,
+        buttons=function(close) return {{
+            {text='Exam',callback=function() session:setMode('practice');close() end},
+            {text='Study',callback=function() session:setMode('study');close() end},
+        }} end}
+end
+
+-- The audio finished by itself: remember it, redraw the open panel, and (exam) finish 2:00 later.
+function Preview:ieltsAudioEnd()
+    local st=self._ielts
+    if not st then return end
+    st.session:setAudioPos(st.test.audio.seconds)
+    if st.session:finished() then return end -- a "Hear it" clip ended
+    if st.session:mode()=='practice' then UIManager:scheduleIn(120,st.autofinish) end
+    if st.panel and st.panel.refresh then st.panel:refresh() end
+end
+
+function Preview:ieltsAutoFinish()
+    local st=self._ielts
+    if not st or st.session:finished() then return end
+    if st.audio then st.audio:stop() end
+    if st.panel and not st.panel._closed then UIManager:close(st.panel,'full') end
+    st.session:pause(os.time());st.session:finish()
+    self:showQuestions()
+end
+
 function Preview:askIeltsMode()
     local session=self._ielts.session
     local function pick(mode,close) session:setMode(mode);close() end
@@ -310,7 +399,7 @@ function Preview:ieltsTick()
     if not st then return end
     local left=st.session:remaining(os.time())
     if left and st.bars then self:showIeltsBars() end
-    if left==0 and not st.session:timeUpNoticed() then
+    if left==0 and st.test.skill~='listening' and not st.session:timeUpNoticed() then
         st.session:noteTimeUp()
         logger.info('Leaf: ielts time up')
         UIManager:show(require('ui/widget/infomessage'):new{text='Time is up — you can keep answering.'})
@@ -340,7 +429,11 @@ function Preview:showQuestions(n,offset)
         results=st.session:finished(),now=os.time,
         on_pick=function(q,off) self:ieltsPick(q,off) end,
         on_passage=function() self:showIeltsBars() end,
-        on_evidence=function(q) self:showIeltsBars();self:showEvidence(q) end})
+        on_evidence=function(q) self:showIeltsBars();self:showEvidence(q) end,
+        audio=st.audio,on_open=function(w) st.panel=w end,
+        exam_left=st.audio and function() return st.test.audio.seconds-st.audio:position()+120 end,
+        on_hear=function(q) if st.audio then st.audio:play(q.at[1],q.at[2]+1) end end,
+        on_finish=function() if st.audio then st.audio:stop() end;UIManager:unschedule(st.autofinish) end})
     if not ok then logger.info('Leaf: ielts error',e);self:showIeltsBars() end
 end
 

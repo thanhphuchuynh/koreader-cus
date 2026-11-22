@@ -25,7 +25,8 @@ local function item(path,t,io)
   local ok2,at=pcall(io.recordMtime,path)
   local it={path=path,title=t.title or path:match('[^/]*$'):gsub('%.epub$',''),total=t.total,minutes=t.minutes,
     answered=s:answered(),active=ok2 and at or 0,state='new'}
-  it.meta=('%d Q · %d min'):format(t.total,t.minutes)..(#t.passages>1 and (' · %d passages'):format(#t.passages) or '')
+  local L=t.skill=='listening'
+  it.meta=(L and 'Listening · ' or '')..('%d Q · %d min'):format(t.total,t.minutes)..(not L and #t.passages>1 and (' · %d passages'):format(#t.passages) or '')
   if s:finished() then
     it.state='done';it.right=I.score(t,answers).right;it.band,it.rough=I.band(it.right,t.total)
   elseif rec then it.state='progress';it.remaining=s:remaining(0) end

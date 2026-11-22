@@ -136,7 +136,7 @@ local t5=assert(I.parse(J.encode(g5)))
 P.show({test=t5,session=S.new(t5,store()),on_pick=function()end,on_evidence=function()end,on_passage=function()end})
 assert(has('later'))
 -- Listening form
-local Ls={version=1,skill='listening',title='Section 1',audio={file='a.pcm',rate=16000,seconds=340},
+local Ls={version=1,skill='listening',title='Section 1',minutes=30,audio={file='a.pcm',rate=16000,seconds=340},
   questions={{n=1,type='gap',words=2,before='Wanted:',after='today',answer='reporter',at={85,90}},
     {n=2,type='gap',words=1,answer='x'},{n=3,type='choice',options={'A','B'},answer='A',at={100,110}}}}
 local lt=assert(I.parse(J.encode(Ls)))
@@ -148,6 +148,7 @@ local left,heard=1720,nil
 local ls=S.new(lt,store());ls:setMode('practice')
 local lo={test=lt,session=ls,audio=audio,now=function() return 0 end,exam_left=function() return left end,
   on_pick=function() error('listening gaps use the keyboard') end,on_hear=function(q) heard=q end,on_evidence=function(q) evidence=q end,on_passage=function() done=true end}
+local fh;lo.on_finish=function() fh=true end
 local function count(pat) local c=0;walk(shown[#shown],function(t) if type(t.text)=='string' and t.text:find(pat,1,true)==1 and t.callback then c=c+1 end end);return c end
 P.show(lo)
 assert(has('Section 1') and has('28:40') and has('▶ 03:12 / 05:40 · plays once') and button('Finish'),'exam: title, countdown, audio row')
@@ -160,6 +161,18 @@ pos=5;button('−10s')();assert(calls[#calls][2]==0,'−10s clamps at 0');pos=19
 button('❚❚')();assert(calls[#calls][1]=='pause' and button('▶') and not button('❚❚'),'toggle pauses and relabels')
 button('▶')();assert(calls[#calls][1]=='play' and calls[#calls][2]==192 and button('❚❚'),'toggle resumes from position')
 button('↺ 1:25')();assert(calls[#calls][1]=='play' and calls[#calls][2]==85)
+-- discrete events redraw so label and clock stay true: -10s, and refresh() when the audio ends by itself
+local opened;lo.on_open=function(w) opened=w end
+playing=false;pos=192;P.show(lo);local n2=#shown
+button('−10s')();assert(#shown==n2+1 and button('❚❚') and not button('▶'),'-10s redraws with the playing label')
+playing=false;pos=340;opened:refresh()
+assert(#shown==n2+2 and button('▶') and has('05:40 / 05:40'),'refresh after the audio ended: label and clock')
+opened:onCloseWidget();opened:refresh();assert(#shown==n2+2,'refresh on a closed panel does nothing')
+lo.on_open=nil;pos=192;playing=true
+-- missing audio file: the panel still opens
+local na={};for k,v in pairs(lo) do na[k]=v end;na.audio=nil;na.exam_left=nil
+ls:setMode('study');P.show(na);assert(has('Section 1') and button('Finish') and not button('−10s'),'study without audio')
+ls:setMode('practice');P.show(na);assert(has('Section 1') and button('Finish'),'exam without audio')
 -- gap → keyboard dialog
 local ns=#shown;local lastClose
 UI.close=function(_,w) lastClose=w end
@@ -186,6 +199,7 @@ w:onCloseWidget();assert(unsched[#unsched]==sched[#sched][2] or unsched[#unsched
 -- results
 UI.close=function(_,x,m) closedW=x;closedMode=m end
 button('Finish')();boxes[#boxes].ok_callback()
+assert(fh,'Finish calls on_finish')
 assert(has('Band ≈') and count('▶ Hear it')==2 and count('Transcript')==3 and not button('Show in passage'),'listening results buttons')
 local hb=walk(shown[#shown],function(t) return t.text=='▶ Hear it' and t.callback end);hb.callback();assert(heard==lt.byNumber[1] and closedW~=shown[#shown],'Hear it plays, panel stays')
 local tb=walk(shown[#shown],function(t) return t.text=='Transcript' and t.callback end);tb.callback();assert(evidence==lt.byNumber[1] and closedMode=='full')

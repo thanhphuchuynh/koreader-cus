@@ -15,14 +15,16 @@ package.preload['ui/widget/container/widgetcontainer']=function() return {extend
 package.preload['ui/uimanager']=function() return UI end
 package.preload['ui/widget/textviewer']=function() return Widget end
 package.preload['ui/widget/dictquicklookup']=function() return {buildButtonLayout=function() return {} end} end
-package.preload['device']=function() return {screen={getWidth=function() return 600 end,getHeight=function() return 800 end,scaleBySize=function(_,s) return s end}} end
+package.preload['device']=function() return {isKindle=function() return false end,screen={getWidth=function() return 600 end,getHeight=function() return 800 end,scaleBySize=function(_,s) return s end}} end
 for _,n in ipairs({'container/inputcontainer','container/framecontainer','verticalgroup','textboxwidget','buttontable','infomessage','inputdialog','horizontalgroup','textwidget','button'}) do
   package.preload['ui/widget/'..n]=function() return Widget end
 end
 package.preload['ui/font']=function() return {getFace=function() return {} end} end
 package.preload['ffi/blitbuffer']=function() return {COLOR_WHITE=255} end
 local panels,popups,panelBoom={},{},false
-package.preload['english_ielts_panel']=function() return {show=function(o) if panelBoom then error('bad test') end;panels[#panels+1]=o;return {panel=true} end} end
+local refreshes=0
+package.preload['english_ielts_panel']=function() return {show=function(o) if panelBoom then error('bad test') end;panels[#panels+1]=o
+  local w={panel=true,refresh=function() refreshes=refreshes+1 end};o.widget=w;if o.on_open then o.on_open(w) end;return w end} end
 package.preload['english_popup']=function() return {show=function(o) popups[#popups+1]=o;return {} end} end
 local bars,confirms={},{}
 package.preload['english_ielts_bars']=function() return {
@@ -58,7 +60,7 @@ local function reader(content)
     TapFooter=function() r.footerTaps=r.footerTaps+1;return 'native' end,maybeUpdateFooter=function() end}
   r.footer=footer;r.highlight=highlight;r.store=store()
   r.passage='Boca Grande replaced its white lamps with ‘amber’ ones'
-  local doc={getWordFromPosition=function() return {sbox={x=280,y=200,w=100,h=40}} end,
+  local doc={file=r.file,getWordFromPosition=function() return {sbox={x=280,y=200,w=100,h=40}} end,
     getDocumentFileContent=function(_,p) assert(p=='META-INF/leaf-ielts.json');return content end,
     getXPointer=function() return '/body/DocFragment['..r.frag..']/body/p[2]/text().0' end,
     getCurrentPage=function() return r.page end,
@@ -282,3 +284,108 @@ assert(st.session.rec.elapsed==e+10,'suspended time is not counted')
 assert(#r.added==0 and r.plugin._ielts==nil and unscheduled>0,'close cleans up')
 assert(r.footer:TapFooter()=='native','footer tap native after close')
 print('PASS: time-up message once, suspend/resume/close keep elapsed, bars kept over suspend and refreshed on resume, margins once')
+
+-- IELTS Listening wiring
+local dir=os.tmpname();os.remove(dir);os.execute('mkdir -p '..dir)
+local pf=io.open(dir..'/a.pcm','wb');pf:write('x');pf:close()
+local audios={}
+package.preload['english_ielts_audio']=function() return {new=function(o)
+  local a={o=o,calls={},playing=false,pos=0}
+  function a:play(f,t) self.calls[#self.calls+1]={'play',f,t};self.playing=true;self.pos=f or 0;return true end
+  function a:pause() self.calls[#self.calls+1]={'pause'};self.playing=false;return self.pos end
+  function a:seek(p) self.pos=p end
+  function a:stop() self.calls[#self.calls+1]={'stop'};self.playing=false end
+  function a:position() return self.pos end
+  function a:isPlaying() return self.playing end
+  audios[#audios+1]=a;return a end} end
+local spoke,speech={}, {}
+package.preload['english_speech']=function() return {new=function() return {available=function() return true end,isSpeaking=function() return false end,stop=function() speech.stops=(speech.stops or 0)+1 end,
+  speak=function(_,t) spoke[#spoke+1]=t;return true end} end} end
+package.preload['english_voca']=function() return {new=function() return {available=function() return false end,isSpeaking=function() return false end,stop=function() end} end} end
+local LKEY=J.encode{version=1,skill='listening',title='Section 1',minutes=30,audio={file='a.pcm',rate=16000,seconds=300},
+  questions={{n=1,type='gap',words=1,answer='x',at={10,20}},{n=2,type='gap',words=1,answer='y'}}}
+local function lreader(file,rec)
+  local r=reader(LKEY);r.ui.document.file=file;r.store.data.leaf_ielts=rec
+  r.plugin:onReaderReady()
+  return r
+end
+local function find120() for i=#scheduled,1,-1 do if scheduled[i][1]==120 then return scheduled[i] end end end
+local function lastCall(a) return a.calls[#a.calls] end
+-- first open: prompt Exam/Study (after the tick), then the panel and the audio from 0
+local nb,na,npop=#bars,#audios,#popups
+local lr=lreader(dir..'/l.epub')
+local lst=lr.plugin._ielts
+assert(lst and #popups==npop and #panels>=0,'prompt waits for the tick')
+ticks[#ticks]()
+local pr=popups[#popups]
+assert(#popups==npop+1 and pr.title=='IELTS Listening' and pr.buttons(function() end)[1][1].text=='Exam' and pr.buttons(function() end)[1][2].text=='Study','mode prompt copy')
+assert(#bars==nb and #audios==na+1,'no reading bars; audio built')
+local au=audios[#audios]
+assert(au.o.path==dir..'/a.pcm' and au.o.rate==16000 and au.o.seconds==300 and au.o.kindle==false,'audio path beside the book: '..au.o.path)
+local np=#panels
+pr.buttons(function() if pr.on_close then pr.on_close() end end)[1][1].callback()
+assert(lst.session:mode()=='practice' and #panels==np+1 and #bars==nb,'Exam: questions panel, no bars')
+local lp=panels[#panels]
+assert(lp.audio and au.calls[1][1]=='play' and au.calls[1][2]==0,'exam plays from 0')
+assert(lp.exam_left()==420,'exam_left = seconds - pos + 120: '..lp.exam_left())
+au.pos=100;assert(lp.exam_left()==320)
+assert(lst.panel==lp.widget,'open panel tracked')
+-- Hear it plays at[1]..at[2]+1; starting audio stops speech
+lr.plugin:getSpeech();speech.stops=0;lp.on_hear({at={10,20}})
+assert(lastCall(au)[1]=='play' and lastCall(au)[2]==10 and lastCall(au)[3]==21,'on_hear range')
+assert(speech.stops>0,'test audio stops speech')
+-- Listen during test audio stops test audio
+au.playing=true
+lr.plugin:getSpeech():speak('hello')
+assert(lastCall(au)[1]=='stop' and spoke[#spoke]=='hello','speech stops test audio')
+-- suspend saves position and stops, resume plays on (exam)
+au.pos=100;au.playing=true
+lr.plugin:onSuspend()
+assert(lastCall(au)[1]=='stop' and lst.session:audioPos()==100 and lst.session.startedAt==nil,'suspend: stop, save pos, pause clock')
+lr.plugin:onResume()
+assert(lastCall(au)[1]=='play' and lastCall(au)[2]==100,'resume plays on in exam')
+-- audio ends: pos=end, open panel redrawn, auto-finish 120 s later
+local rf=refreshes
+au.playing=false;au.on_end()
+assert(lst.session:audioPos()==300 and refreshes==rf+1,'ended: position saved, open panel refreshed')
+local auto=assert(find120(),'auto-finish scheduled at 120 s')
+np=#panels
+auto[2]()
+assert(lst.session:finished() and lst.session.startedAt==nil and panels[#panels].results==true and #panels==np+1,'auto-finish scores')
+assert(closed[#closed]==lp.widget,'old panel closed before results')
+-- Finish by hand stops audio and cancels the auto-finish
+local lr2=lreader(dir..'/l.epub',{mode='practice',answers={},elapsed=0,audio_pos=50});ticks[#ticks]()
+local au2=audios[#audios]
+assert(au2.calls[1][1]=='play' and au2.calls[1][2]==50,'reopen exam: plays from saved position')
+local un=unscheduled;panels[#panels].on_finish()
+assert(lastCall(au2)[1]=='stop' and unscheduled>un,'on_finish stops audio and unschedules')
+-- Reopen exam after the audio ended: no playback, finishes 120 s later
+local lr3=lreader(dir..'/l.epub',{mode='practice',answers={},elapsed=0,audio_pos=300});ticks[#ticks]()
+local au3=audios[#audios]
+assert(#au3.calls==0 and panels[#panels].exam_left()==120,'reopen after end: no play, 2:00 left')
+find120()[2]()
+assert(lr3.plugin._ielts.session:finished() and panels[#panels].results==true,'reopen after end finishes')
+-- Study: paused until play; saved position kept
+local lr4=lreader(dir..'/l.epub',{mode='study',answers={},elapsed=0,audio_pos=50});ticks[#ticks]()
+local au4=audios[#audios]
+assert(#au4.calls==0 and panels[#panels].audio==au4,'study reopen: panel shown, audio paused')
+au4.pos=70;au4.playing=true;lr4.plugin:onSuspend()
+lr4.plugin:onResume();assert(lastCall(au4)[1]=='stop','study stays paused on resume')
+au4.playing=true;lr4.plugin:onCloseDocument()
+assert(lastCall(au4)[1]=='stop' and lr4.store.data.leaf_ielts.audio_pos==70,'close stops audio and saves position')
+-- Missing audio file: message, panel opens
+local lr5=lreader(dir..'/none/l.epub');ticks[#ticks]()
+local pr5=popups[#popups];np=#panels
+pr5.buttons(function() end)[1][2].callback();pr5.on_close()
+local info;for _,w in ipairs(shown) do if w.text=='Audio file not found: a.pcm' then info=w end end
+assert(info,'missing audio message')
+assert(#panels==np+1 and panels[#panels].audio==nil and panels[#panels].exam_left==nil and lr5.plugin._ielts.session:mode()=='study','test opens without audio')
+-- Finished: reading bars labelled Transcript; Hear it works
+nb=#bars
+local lr6=lreader(dir..'/l.epub',{mode='practice',answers={},elapsed=0,finished=true});ticks[#ticks]()
+assert(#bars==nb+1 and live().o.passage_label=='Transcript','finished: Transcript bars')
+lr6.plugin:showQuestions();local au6=audios[#audios];panels[#panels].on_hear({at={30,40}})
+assert(lastCall(au6)[2]==30 and lastCall(au6)[3]==41,'Hear it after finish')
+lr6.plugin:onCloseDocument()
+os.execute('rm -rf '..dir)
+print('PASS: listening wiring: prompt, audio path, suspend/resume/close, auto-finish, missing audio, transcript bars')
