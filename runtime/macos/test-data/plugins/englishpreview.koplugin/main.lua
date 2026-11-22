@@ -6,6 +6,25 @@ local Screen = require('device').screen
 local logger = require('logger')
 local Preview = WidgetContainer:extend{ name = 'englishpreview' }
 
+-- Tests tab (SimpleUI). Process-wide: the file manager's Preview is gone by the time the test opens.
+local tests_registered,pending_review=false,nil
+local function openTest(path) require('apps/reader/readerui'):showReader(path) end
+local test_actions={
+    open=openTest,
+    review=function(path) pending_review=path;openTest(path) end,
+    retry=function(path)
+        UIManager:show(require('ui/widget/confirmbox'):new{text='Clear your answers for this test and start again?',
+            ok_text='Retry',cancel_text='Cancel',ok_callback=function()
+                local ds=require('docsettings'):open(path)
+                local rec=ds:readSetting('leaf_ielts')
+                ds:saveSetting('leaf_ielts',{mode=type(rec)=='table' and rec.mode or nil,answers={},elapsed=0}) -- as Session:reset
+                ds:flush()
+                logger.info('Leaf: tests retry',path)
+                openTest(path)
+            end})
+    end,
+}
+
 local samples = {
     reluctantly = {
         base = 'reluctant', formation = 'reluctant + -ly → adverb',
@@ -167,6 +186,8 @@ end
 -- IELTS Reading: a test EPUB carries META-INF/leaf-ielts.json. Any failure leaves the book as a normal book.
 function Preview:loadIelts()
     if not self.ui.rolling or not self.ui.document or not self.ui.document.getDocumentFileContent then return end
+    local review=pending_review
+    pending_review=nil
     local ok,err=pcall(function()
         local raw=self.ui.document:getDocumentFileContent('META-INF/leaf-ielts.json')
         if not raw then return end
@@ -193,6 +214,7 @@ function Preview:loadIelts()
         UIManager:scheduleIn(60,st.tick)
         logger.info('Leaf: ielts test',test.total,'questions, mode',session:mode() or 'unset')
         if not session:mode() then self:askIeltsMode() end
+        if review and review==self.ui.document.file and session:finished() then self:showQuestions() end
     end)
     if not ok then logger.info('Leaf: ielts error',err);self:closeIelts() end
 end
@@ -696,7 +718,45 @@ function Preview:installTapLookup()
     end
 end
 
+-- Once ever (Leaf's own flag): a "Tests" custom screen with the module, its tab right after Home.
+-- A tab the user removes later stays removed.
+function Preview:installTestsTab()
+    if G_reader_settings:isTrue('leaf_tests_tab_done') then return end
+    local Screens=require('infra/sui_custom_screens')
+    local Store,Config=require('infra/sui_store'),require('infra/sui_config')
+    local screen=Screens.create('Tests')
+    Store:saveSetting(screen.pfx..'leaf_tests_enabled',true)
+    Store:saveSetting(screen.layout_key,{pages={{id=1,modules={'leaf_tests'}}}})
+    Store:flush()
+    local tabs=Config.loadTabConfig()
+    if #tabs<Config.effectiveMaxTabs() then
+        local at=1
+        for i,id in ipairs(tabs) do if id=='homescreen' then at=i+1;break end end
+        table.insert(tabs,at,Screens.qaId(screen.id))
+        Config.saveTabConfig(tabs)
+        logger.info('Leaf: tests tab added at',at)
+    else
+        logger.info('Leaf: tests tab bar full')
+        UIManager:show(require('ui/widget/infomessage'):new{text='The tab bar is full. Add "Tests" from SimpleUI → Tab bar.'})
+    end
+    G_reader_settings:saveSetting('leaf_tests_tab_done',true)
+    G_reader_settings:flush()
+end
+
 function Preview:init()
+    -- Before the no-document return: the Tests tab lives in the file manager.
+    local ok,err=pcall(function()
+        local has_sui,Registry=pcall(require,'modules/moduleregistry')
+        if not has_sui then return end
+        if not tests_registered then
+            local mod=require('english_tests_module')
+            mod.actions=test_actions
+            Registry.register(mod)
+            tests_registered=true
+        end
+        self:installTestsTab()
+    end)
+    if not ok then logger.info('Leaf: tests tab error',err) end
     self.ui.menu:registerToMainMenu(self)
     local dictionary = self.ui.dictionary
     if not dictionary or not self.ui.document then return end
