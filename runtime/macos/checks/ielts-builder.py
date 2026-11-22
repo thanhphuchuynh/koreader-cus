@@ -60,4 +60,22 @@ r, _ = build(d, 'quotes')
 assert r.returncode == 0, r.stderr
 emb = json.loads(zipfile.ZipFile(r.stdout.strip()).read('META-INF/leaf-ielts.json'))
 assert q(emb, 1)['evidence'] == 'It’s “fine” – really.', 'evidence rewritten to the exact passage text'
+
+def listening(d):
+    d['skill'] = 'listening'; d['audio'] = {'file': 't.pcm', 'rate': 16000, 'seconds': 100}
+    q(d, 1)['at'] = [10, 12.5]; q(d, 5)['accept'] = ['x']
+d = copy.deepcopy(src); listening(d)
+r, _ = build(d, 'listen')
+assert r.returncode == 0, r.stderr
+assert json.loads(zipfile.ZipFile(r.stdout.strip()).read('META-INF/leaf-ielts.json'))['audio']['rate'] == 16000
+def lfail(mutate, *words, name):
+    d = copy.deepcopy(src); listening(d); mutate(d)
+    r, _ = build(d, name)
+    assert r.returncode == 1, (name, r.stderr)
+    for w in words: assert w in r.stderr, (name, w, r.stderr)
+lfail(lambda d: q(d, 1).update(at=[10, 101]), 'question 1', 'at', name='atbig')
+lfail(lambda d: q(d, 1).update(at=[12, 10]), 'at', name='atorder')
+lfail(lambda d: d['audio'].pop('rate'), 'audio', 'rate', name='norate')
+lfail(lambda d: d['audio'].update(file=''), 'audio', 'file', name='nofile')
+lfail(lambda d: q(d, 5).update(accept='x'), 'question 5', 'accept', name='badaccept')
 print('PASS: ielts-builder')

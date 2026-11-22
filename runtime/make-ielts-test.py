@@ -22,6 +22,7 @@ def numbers(q):
     return q['n'] if isinstance(q['n'], list) else [q['n']]
 
 def is_int(x): return isinstance(x, int) and not isinstance(x, bool)
+def is_num(x): return isinstance(x, (int, float)) and not isinstance(x, bool)
 
 def find(ev, text):
     """The exact substring of text matching ev under norm(), or None (so the device search is exact)."""
@@ -39,6 +40,11 @@ def validate(t):
         if not (is_int(p.get('from')) and is_int(p.get('to')) and p['from'] <= p['to']):
             raise ValueError(f'passage {i}: from/to must be integers with from <= to')
         if not p.get('paragraphs'): raise ValueError(f"passage {i} has no paragraphs")
+    if t.get('skill') == 'listening':
+        a = t.get('audio') if isinstance(t.get('audio'), dict) else {}
+        if not (isinstance(a.get('file'), str) and a['file']): raise ValueError('audio.file must be a non-empty string')
+        if not (is_int(a.get('rate')) and a['rate'] > 0): raise ValueError('audio.rate must be a positive integer')
+        if not (is_num(a.get('seconds')) and a['seconds'] > 0): raise ValueError('audio.seconds must be a positive number')
     qs, seen = t.get('questions') or [], set()
     if not qs: raise ValueError('no questions')
     for q in qs:
@@ -64,6 +70,14 @@ def validate(t):
                 raise ValueError(f'question {n}: picks must be 1..{len(ns)}')
         homes = [p for p in ps if all(p['from'] <= x <= p['to'] for x in ns)]
         if not homes: raise ValueError(f'question {n} is in no passage range')
+        if t.get('skill') == 'listening':
+            at = q.get('at')
+            if at is not None and not (isinstance(at, list) and len(at) == 2 and all(is_num(x) for x in at)
+                                       and 0 <= at[0] <= at[1] <= t['audio']['seconds']):
+                raise ValueError(f"question {n}: at must be [from, to] seconds within the audio, 0 <= from <= to")
+            acc = q.get('accept')
+            if acc is not None and not (isinstance(acc, list) and all(isinstance(x, str) for x in acc)):
+                raise ValueError(f'question {n}: accept must be a list of strings')
         ev = q.get('evidence')
         if ev:
             hit = next((h for h in (find(ev, x) for x in homes[0]['paragraphs']) if h), None)
