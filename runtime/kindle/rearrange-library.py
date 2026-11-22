@@ -32,23 +32,23 @@ MOVES = {  # source (relative to the Kindle root) -> folder in documents/
     f'{EXT}/Martin Kleppmann-Designing Data-Intensive Applications_ The Big Ideas Behind Reliable, Scalable, and Maintainable Systems-O’Reilly Media (2017).epub': 'Tech & Business',
     f'{EXT}/Hacking- The Art of Exploitation (2nd ed. 2008) - Erickson.pdf': 'Tech & Business',
     f'{EXT}/Traction-1-3.pdf': 'Tech & Business',
-    f'{D}/Lao Tu - Dao Duc Kinh - Nguyen Hien Le.epub': 'Tiếng Việt',
-    f'{EXT}/Bo Gia - Mario Puzo (11).epub': 'Tiếng Việt',
-    f'{EXT}/Kafka Ben Bo Bien - Haruki Murakami.azw3': 'Tiếng Việt',
-    f'{EXT}/Ong tram tuoi boc hoi qua cua so - Jonas Jonasson (13).epub': 'Tiếng Việt',
-    f'{EXT}/SachMoi.net-Trang-Trinh-sam-va-ky.epub': 'Tiếng Việt',
-    f'{EXT}/Ngo Sa Thach - Luat Tam Thuc_compressed.pdf': 'Tiếng Việt',
-    f'{D}/thietkenguoidung.azw3': 'Tiếng Việt',
-    f'{D}/KindleShare - The Ke nguoi dung lam trung tam.azw3': 'Tiếng Việt',
-    f'{D}/co-chan-nhan_bilingual.epub': 'Truyện',
-    f'{D}/kiem-lai_bilingual.epub': 'Truyện',
-    f'{EXT}/Co Chan Nhan - Co Chan Nhan (17).epub': 'Truyện',
-    f'{EXT}/Kiếm Lai - Phong Hỏa Hí Chư Hầu.epub': 'Truyện',
-    f'{EXT}/Cau Ma - Nhi Can (15).epub': 'Truyện',
-    f'{EXT}/cauma_bilingual.epub': 'Truyện',
-    f'{EXT}/Tiên Nghịch - Nhĩ Căn.azw3': 'Truyện',
-    f'{EXT}/Nhiều Năm Rồi Ta Không Dùng Kiếm - Anan.azw3': 'Truyện',
-    f'{EXT}/Dung Den Buc Ta, Ta Chi Muon Nam Ngua Tu - Tam Luong Me Tuu (12).epub': 'Truyện',
+    f'{D}/Lao Tu - Dao Duc Kinh - Nguyen Hien Le.epub': 'tiengviet',
+    f'{EXT}/Bo Gia - Mario Puzo (11).epub': 'tiengviet',
+    f'{EXT}/Kafka Ben Bo Bien - Haruki Murakami.azw3': 'tiengviet',
+    f'{EXT}/Ong tram tuoi boc hoi qua cua so - Jonas Jonasson (13).epub': 'tiengviet',
+    f'{EXT}/SachMoi.net-Trang-Trinh-sam-va-ky.epub': 'tiengviet',
+    f'{EXT}/Ngo Sa Thach - Luat Tam Thuc_compressed.pdf': 'tiengviet',
+    f'{D}/thietkenguoidung.azw3': 'tiengviet',
+    f'{D}/KindleShare - The Ke nguoi dung lam trung tam.azw3': 'tiengviet',
+    f'{D}/co-chan-nhan_bilingual.epub': 'truyen',
+    f'{D}/kiem-lai_bilingual.epub': 'truyen',
+    f'{EXT}/Co Chan Nhan - Co Chan Nhan (17).epub': 'truyen',
+    f'{EXT}/Kiếm Lai - Phong Hỏa Hí Chư Hầu.epub': 'truyen',
+    f'{EXT}/Cau Ma - Nhi Can (15).epub': 'truyen',
+    f'{EXT}/cauma_bilingual.epub': 'truyen',
+    f'{EXT}/Tiên Nghịch - Nhĩ Căn.azw3': 'truyen',
+    f'{EXT}/Nhiều Năm Rồi Ta Không Dùng Kiếm - Anan.azw3': 'truyen',
+    f'{EXT}/Dung Den Buc Ta, Ta Chi Muon Nam Ngua Tu - Tam Luong Me Tuu (12).epub': 'truyen',
 }
 REMOVE = [  # extra copies: kept copy noted; backed up to the Mac, then removed
     f'{EXT}/Harry Potter and the Philosopher\'s Stone - J.K. Rowling (16).epub',  # KorPiracy copy has progress
@@ -62,7 +62,7 @@ REMOVE = [  # extra copies: kept copy noted; backed up to the Mac, then removed
     f'{EXT}/Cầu Ma - Nhĩ Căn.azw3',             # (15).epub kept (EPUB)
     f'{EXT}/Cầu Ma - Nhĩ Căn_bilingual.azw3',    # cauma_bilingual.epub has 24% progress
 ]
-FOLDERS = ['English', 'Tech & Business', 'Tiếng Việt', 'Truyện', 'IELTS']
+FOLDERS = ['English', 'Tech & Business', 'tiengviet', 'truyen', 'IELTS']
 PATH_FILES = ['koreadercus/profile/history.lua', 'koreader/history.lua',
               'koreadercus/profile/settings.reader.lua', 'koreader/settings.reader.lua',
               'koreadercus/profile/settings/collection.lua', 'koreader/settings/collection.lua']
