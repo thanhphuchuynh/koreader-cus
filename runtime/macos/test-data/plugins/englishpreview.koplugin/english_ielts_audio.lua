@@ -26,10 +26,11 @@ function M.new(o)
  function self:isPlaying()return pid~=nil end
  function self:position()
   if not pid then return frozen end
-  local p=start+M.now()-began
-  return limit and math.min(p,limit) or math.min(p,o.seconds)
+  -- the first 0.5 s on the Kindle is silent lead-in
+  local p=start+math.max(0,M.now()-began-(o.kindle and 0.5 or 0))
+  return math.min(p,limit)
  end
- function self:stop()halt();frozen=self:position() end
+ function self:stop()local p=self:position();halt();frozen=p end
  function self:pause()
   local p=self:position();halt();frozen=p;return p
  end
@@ -38,15 +39,20 @@ function M.new(o)
   from=math.max(0,math.min(from or 0,o.seconds-1/o.rate))
   to=to and math.min(to,o.seconds) or nil
   if to and to<=from then return nil end
-  local command
+  local command,skip
   if o.kindle then
    local v=V.gstVersion();if not v then return nil end
    V.musicFocus()
    local caps=v=='0.10'
     and ('audio/x-raw-int,endianness=1234,signed=true,width=16,depth=16,rate=%d,channels=1'):format(o.rate)
     or ('audio/x-raw,format=S16LE,rate=%d,channels=1,layout=interleaved'):format(o.rate)
-   local count=to and (' count='..math.ceil(to-math.floor(from))) or ''
-   command='dd if='..q(o.path)..' bs='..(o.rate*2)..' skip='..math.floor(from)..count..' 2>/dev/null | '
+   -- 10 ms blocks give sub-second seek; 0.5 s lead-in (A2DP wake-up) and 1 s tail (mixer ring) of silence as in english_voca.
+   skip=math.floor(from*100+1e-6)
+   local count=to and math.ceil(to*100-1e-6)-skip or nil
+   if count and count<1 then return nil end
+   limit=count and (skip+count)/100 or o.seconds
+   command='( dd if=/dev/zero bs='..o.rate..' count=1 ; dd if='..q(o.path)..' bs='..math.floor(o.rate/50)..' skip='..skip
+    ..(count and ' count='..count or '')..' ; dd if=/dev/zero bs='..(o.rate*2)..' count=1 ) 2>/dev/null | '
     ..q(V.bin_dir..'/gst-launch-'..v)..' fdsrc ! capsfilter caps='..q(caps)..' ! mixersink stream-type=Music sync=true'
   else
    local f=io.open(o.path,'rb');if not f then return nil end
@@ -58,12 +64,14 @@ function M.new(o)
   -- $! is the last pipeline command (gst); killing it ends dd by SIGPIPE.
   pid=V.spawn(command)
   if not pid then return nil end
-  start,began,limit,frozen=from,M.now(),to,from
+  start=skip and skip/100 or from
+  began,frozen=M.now(),start
+  if not skip then limit=to or o.seconds end
   local function tick()
    poll=nil
    if not pid then return end
    if V.alive(pid) then poll=tick;UI:scheduleIn(0.5,tick);return end
-   pid=nil;frozen=to or o.seconds
+   pid=nil;frozen=limit
    if self.on_end then self.on_end() end
   end
   poll=tick;UI:scheduleIn(0.5,tick)
