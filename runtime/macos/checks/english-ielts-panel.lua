@@ -148,7 +148,7 @@ local left,heard=1720,nil
 local ls=S.new(lt,store());ls:setMode('practice')
 local lo={test=lt,session=ls,audio=audio,now=function() return 0 end,exam_left=function() return left end,
   on_pick=function() error('listening gaps use the keyboard') end,on_hear=function(q) heard=q end,on_evidence=function(q) evidence=q end,on_passage=function() done=true end}
-local fh;lo.on_finish=function() fh=true end
+local fh,retried;lo.on_finish=function() fh=true end;lo.on_retry=function() retried=true end
 local function count(pat) local c=0;walk(shown[#shown],function(t) if type(t.text)=='string' and t.text:find(pat,1,true)==1 and t.callback then c=c+1 end end);return c end
 P.show(lo)
 assert(has('Section 1') and has('28:40') and has('▶ 03:12 / 05:40 · plays once') and button('Finish'),'exam: title, countdown, audio row')
@@ -161,13 +161,13 @@ pos=5;button('−10s')();assert(calls[#calls][2]==0,'−10s clamps at 0');pos=19
 button('❚❚')();assert(calls[#calls][1]=='pause' and button('▶') and not button('❚❚'),'toggle pauses and relabels')
 button('▶')();assert(calls[#calls][1]=='play' and calls[#calls][2]==192 and button('❚❚'),'toggle resumes from position')
 button('↺ 1:25')();assert(calls[#calls][1]=='play' and calls[#calls][2]==85)
--- discrete events redraw so label and clock stay true: -10s, and refresh() when the audio ends by itself
+-- discrete events update in place (never reopen the panel): -10s, and updateAudio() when the audio ends by itself
 local opened;lo.on_open=function(w) opened=w end
 playing=false;pos=192;P.show(lo);local n2=#shown
-button('−10s')();assert(#shown==n2+1 and button('❚❚') and not button('▶'),'-10s redraws with the playing label')
-playing=false;pos=340;opened:refresh()
-assert(#shown==n2+2 and button('▶') and has('05:40 / 05:40'),'refresh after the audio ended: label and clock')
-opened:onCloseWidget();opened:refresh();assert(#shown==n2+2,'refresh on a closed panel does nothing')
+button('−10s')();assert(#shown==n2 and button('❚❚') and not button('▶'),'-10s updates the label in place')
+playing=false;pos=340;opened:updateAudio()
+assert(#shown==n2 and button('▶') and has('05:40 / 05:40'),'updateAudio after the audio ended: label and clock')
+opened:onCloseWidget();opened:updateAudio();assert(#shown==n2,'closed panel: nothing')
 lo.on_open=nil;pos=192;playing=true
 -- missing audio file: the panel still opens
 local na={};for k,v in pairs(lo) do na[k]=v end;na.audio=nil;na.exam_left=nil
@@ -184,6 +184,7 @@ dlg.typed='  cub reporter ';dbtn('Cancel')();assert(ls:answer(1)==nil and lastCl
 dbtn('Save')();assert(ls:answer(1)=='cub reporter' and #shown==ns+1 and has('cub reporter'),'Save stores, closes dialog, redraws')
 ls:setAnswer(2,'x');P.show(lo)
 button('2  x')();assert(dialogs[#dialogs].title=='Q2 · up to 1 word' and dialogs[#dialogs].input=='x','singular title, current answer prefilled')
+shown[#shown]:closeDialog();assert(lastClose==dialogs[#dialogs],'closeDialog closes the open gap dialog')
 -- 10 s tick: in place, never closes or reopens the panel
 ls:setMode('practice');P.show(lo)
 local w=shown[#shown];local tick=sched[#sched]
@@ -203,4 +204,5 @@ assert(fh,'Finish calls on_finish')
 assert(has('Band ≈') and count('▶ Hear it')==2 and count('Transcript')==3 and not button('Show in passage'),'listening results buttons')
 local hb=walk(shown[#shown],function(t) return t.text=='▶ Hear it' and t.callback end);hb.callback();assert(heard==lt.byNumber[1] and closedW~=shown[#shown],'Hear it plays, panel stays')
 local tb=walk(shown[#shown],function(t) return t.text=='Transcript' and t.callback end);tb.callback();assert(evidence==lt.byNumber[1] and closedMode=='full')
+button('Try again')();assert(retried,'Try again calls on_retry')
 print('PASS: ielts panel, selection, multi cap, blanks, passage switch, results')

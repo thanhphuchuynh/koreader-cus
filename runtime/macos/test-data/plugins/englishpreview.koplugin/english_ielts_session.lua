@@ -17,6 +17,8 @@ function M:mode() return self.rec.mode end
 function M:setMode(m) self.rec.mode=m;self:save() end
 function M:audioPos() return self.rec.audio_pos or 0 end -- listening: seconds into the audio
 function M:setAudioPos(p) self.rec.audio_pos=p;self:save() end
+function M:checkLeft() return self.rec.check_left end -- listening exam: seconds of check time left after the audio ended
+function M:setCheckLeft(v) self.rec.check_left=v;self:save() end
 function M:answer(n) return self.rec.answers[n] end
 function M:setAnswer(n,v) self.rec.answers[n]=v;self:save() end
 

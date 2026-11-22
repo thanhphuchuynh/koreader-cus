@@ -33,7 +33,7 @@ function M.show(o)
   local L=test.skill=='listening'
   local audio=o.audio
   local exam=session:mode()=='practice'
-  local rowText,top,bottom
+  local rowText,top,bottom,playBtn
   local function text(s,size,face)
     col[#col+1]=TextBox:new{text=s,face=Font:getFace(face or 'cfont',size or 18),width=inner}
   end
@@ -85,7 +85,7 @@ function M.show(o)
       buttons(b)
     end
     gap()
-    buttons{{text='Try again',callback=function() session:reset();session:start(now());redraw{results=false,offset=false} end},
+    buttons{{text='Try again',callback=function() session:reset();if o.on_retry then o.on_retry() end;session:start(now());redraw{results=false,offset=false} end},
       {text='Done',callback=function() UI:close(widget,'full');o.on_passage() end}}
   else
     local multi=#(test.passages or {})>1
@@ -121,11 +121,13 @@ function M.show(o)
           local dialog
           dialog=require('ui/widget/inputdialog'):new{title=('Q%d%s'):format(n,words and (' · up to %d word%s'):format(words,words==1 and '' or 's') or ''),
             input=session:answer(n) or '',buttons={{
-              {text='Cancel',callback=function() UI:close(dialog) end},
+              {text='Cancel',callback=function() widget._dialog=nil;UI:close(dialog) end},
               {text='Save',callback=function()
+                widget._dialog=nil
                 session:setAnswer(n,(dialog:getInputText() or ''):match('^%s*(.-)%s*$'))
-                UI:close(dialog);redraw()
+                UI:close(dialog);if not widget._closed then redraw() end
               end}}}}
+          widget._dialog=dialog
           UI:show(dialog);dialog:onShowKeyboard()
         end or function()
           local off=widget._scroll and widget._scroll:getScrolledOffset()
@@ -184,7 +186,7 @@ function M.show(o)
     -- 'full': closing with no refresh type repaints the reader but never updates the display (ghosting).
     local function toPassage() UI:close(widget,'full');o.on_passage() end
     local r=exam and (L and o.exam_left and o.exam_left() or session:remaining(now()))
-    local function finish() Bars.confirmFinish(function() if o.on_finish then o.on_finish() end;session:pause(now());session:finish();redraw{results=true,offset=false,refresh='full'} end) end
+    local function finish() Bars.confirmFinish(function() widget:closeDialog();if o.on_finish then o.on_finish() end;session:pause(now());session:finish();redraw{results=true,offset=false,refresh='full'} end) end
     if L then
       top=Bars.top(w,{title=test.title or 'Listening',timer=r and mmss(r) or nil},widget)
       bottom=Bars.bottom(w,{view='listening',on_finish=finish},widget)
@@ -211,17 +213,20 @@ function M.show(o)
         g[1]=rowText
       else
         local bw=Screen:scaleBySize(80)
-        g[1]=Button:new{text='−10s',width=bw,callback=function() audio:play(math.max(0,audio:position()-10));redraw() end,show_parent=widget}
-        g[2]=Button:new{text=audio:isPlaying() and '❚❚' or '▶',width=bw,show_parent=widget,callback=function()
+        g[1]=Button:new{text='−10s',width=bw,callback=function() audio:play(math.max(0,audio:position()-10));widget:updateAudio() end,show_parent=widget}
+        playBtn=Button:new{text=audio:isPlaying() and '❚❚' or '▶',width=bw,show_parent=widget,callback=function()
           if audio:isPlaying() then audio:pause() else audio:play(audio:position()) end
           redraw()
         end}
+        g[2]=playBtn
         rowText=TextWidget:new{text=clock(),face=Font:getFace('cfont',18),max_width=inner-2*bw}
         g[3]=rowText
       end
       audioRow=require('ui/widget/container/leftcontainer'):new{dimen=Geom:new{w=w,h=arow},
         FrameContainer:new{padding=0,padding_left=pad,bordersize=0,g}}
       function widget:updateAudio()
+        if self._closed then return end
+        if playBtn then playBtn:setText(audio:isPlaying() and '❚❚' or '▶') end
         rowText:setText(exam and '▶ '..clock()..' · plays once' or clock())
         if exam and o.exam_left and top.timer_text then top.timer_text:setText(mmss(o.exam_left())) end
         UI:setDirty(widget,'ui',Geom:new{x=0,y=0,w=w,h=Bars.height()+arow}) -- top bar (timer) + audio row only
@@ -229,7 +234,6 @@ function M.show(o)
       local function tick() widget:updateAudio();UI:scheduleIn(10,tick) end
       UI:scheduleIn(10,tick)
       function widget:onCloseWidget() UI:unschedule(tick);self._closed=true end
-      function widget:refresh() if not self._closed then redraw() end end -- audio ended by itself: label and clock
     end
     body=VerticalGroup:new{align='left',top,
       require('ui/widget/container/leftcontainer'):new{dimen=Geom:new{w=w,h=dh}, -- FrameContainer height is paint-only, not layout
@@ -239,6 +243,7 @@ function M.show(o)
   end
   widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,width=w,height=h,body} -- white to the screen edge
   widget._col=col
+  function widget:closeDialog() if self._dialog then UI:close(self._dialog);self._dialog=nil end end -- before the test is scored
   UI:show(widget,o.refresh or 'full')
   if o.on_open then o.on_open(widget) end
   return widget

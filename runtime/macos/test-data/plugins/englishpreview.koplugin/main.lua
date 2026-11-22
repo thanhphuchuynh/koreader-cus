@@ -181,7 +181,7 @@ end
 function Preview:onSuspend()
     if self._speech then self._speech:stop() end
     local st=self._ielts
-    if st and st.audio then st.audio:stop() end
+    if st and st.audio then st.audio:stop();self:ieltsDisarm() end
     if st then st.session:pause(os.time()) end -- bars stay, under the screensaver
 end
 
@@ -194,7 +194,7 @@ function Preview:onResume()
     local a=st.audio
     if a and not st.session:finished() then
         if st.session:mode()=='practice' then self:ieltsPlayOn() end
-        if st.panel and st.panel.refresh then st.panel:refresh() end -- ▶/❚❚ and clock
+        if st.panel then st.panel:updateAudio() end -- ▶/❚❚ and clock, in place
     end
 end
 
@@ -236,9 +236,9 @@ function Preview:closeIelts()
     if not st then return end
     pcall(function()
         self:hideIeltsBars()
-        if st.audio then st.audio:stop() end
+        if st.audio then st.audio:stop();self:ieltsDisarm() end
         st.session:pause(os.time())
-        UIManager:unschedule(st.tick);UIManager:unschedule(st.autofinish)
+        UIManager:unschedule(st.tick)
     end)
     self._ielts=nil
 end
@@ -333,25 +333,49 @@ function Preview:ieltsAudio(quiet)
     return a
 end
 
--- Exam: play on from the saved position, or (already past the end) just wait out the 2:00.
+-- Exam check time (after the audio ended): counts down by wall time while the test is open, saved as check_left.
+function Preview:ieltsArm(left)
+    local st=self._ielts
+    UIManager:unschedule(st.autofinish)
+    st.check_end=os.time()+left
+    UIManager:scheduleIn(left,st.autofinish)
+end
+
+function Preview:ieltsDisarm(clear)
+    local st=self._ielts
+    UIManager:unschedule(st.autofinish)
+    if st.check_end and not clear then st.session:setCheckLeft(math.max(0,st.check_end-os.time())) end
+    st.check_end=nil
+end
+
+-- Exam: play on from the saved position; past the end, wait out the saved (or full) check time.
 function Preview:ieltsPlayOn()
     local st=self._ielts
     local pos=st.session:audioPos()
     if pos<st.test.audio.seconds then st.audio:play(pos)
-    else UIManager:unschedule(st.autofinish);UIManager:scheduleIn(120,st.autofinish) end
+    else self:ieltsArm(st.session:checkLeft() or 120) end
+end
+
+function Preview:ieltsRetry()
+    local st=self._ielts
+    if not st.audio then return end
+    st.audio:stop();st.audio:seek(0)
+    self:ieltsDisarm(true)
+    st.session:setAudioPos(0) -- stop() saved the old position after the reset
+    if st.session:mode()=='practice' then self:ieltsPlayOn() end
 end
 
 function Preview:startListening()
     local st=self._ielts
     local session=st.session
-    local function go()
+    local function go(first)
         if not session:mode() then session:setMode('study') end -- prompt dismissed without a choice: no clock
         self:showQuestions()
-        if st.audio and session:mode()=='practice' then self:ieltsPlayOn() end
+        if st.audio and (first or session:mode()=='practice') then self:ieltsPlayOn() end -- Study reopen: paused until play
     end
     if session:mode() then return go() end
     local done=false
-    local function once() if not done then done=true;go() end end
+    local function once() if not done then done=true;go(true) end end
     require('english_popup').show{title='IELTS Listening',
         text='Exam: the audio plays once, timed.\nStudy: pause, go back 10 s, replay a question.',
         on_close=once,
@@ -367,15 +391,19 @@ function Preview:ieltsAudioEnd()
     if not st then return end
     st.session:setAudioPos(st.test.audio.seconds)
     if st.session:finished() then return end -- a "Hear it" clip ended
-    if st.session:mode()=='practice' then UIManager:scheduleIn(120,st.autofinish) end
-    if st.panel and st.panel.refresh then st.panel:refresh() end
+    if st.session:mode()=='practice' then self:ieltsArm(120) end
+    if st.panel then st.panel:updateAudio() end
 end
 
 function Preview:ieltsAutoFinish()
     local st=self._ielts
     if not st or st.session:finished() then return end
     if st.audio then st.audio:stop() end
-    if st.panel and not st.panel._closed then UIManager:close(st.panel,'full') end
+    self:ieltsDisarm(true)
+    if st.panel and not st.panel._closed then
+        st.panel:closeDialog() -- no answer may change after scoring
+        UIManager:close(st.panel,'full')
+    end
     st.session:pause(os.time());st.session:finish()
     self:showQuestions()
 end
@@ -431,9 +459,13 @@ function Preview:showQuestions(n,offset)
         on_passage=function() self:showIeltsBars() end,
         on_evidence=function(q) self:showIeltsBars();self:showEvidence(q) end,
         audio=st.audio,on_open=function(w) st.panel=w end,
-        exam_left=st.audio and function() return st.test.audio.seconds-st.audio:position()+120 end,
+        exam_left=st.audio and function()
+            if st.check_end then return math.max(0,st.check_end-os.time()) end
+            return st.test.audio.seconds-st.audio:position()+120
+        end,
         on_hear=function(q) if st.audio then st.audio:play(q.at[1],q.at[2]+1) end end,
-        on_finish=function() if st.audio then st.audio:stop() end;UIManager:unschedule(st.autofinish) end})
+        on_finish=function() if st.audio then st.audio:stop();self:ieltsDisarm(true) end end,
+        on_retry=function() self:ieltsRetry() end})
     if not ok then logger.info('Leaf: ielts error',e);self:showIeltsBars() end
 end
 

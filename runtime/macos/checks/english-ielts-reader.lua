@@ -22,9 +22,9 @@ end
 package.preload['ui/font']=function() return {getFace=function() return {} end} end
 package.preload['ffi/blitbuffer']=function() return {COLOR_WHITE=255} end
 local panels,popups,panelBoom={},{},false
-local refreshes=0
+local refreshes,dialogsClosed=0,0
 package.preload['english_ielts_panel']=function() return {show=function(o) if panelBoom then error('bad test') end;panels[#panels+1]=o
-  local w={panel=true,refresh=function() refreshes=refreshes+1 end};o.widget=w;if o.on_open then o.on_open(w) end;return w end} end
+  local w={panel=true,updateAudio=function() refreshes=refreshes+1 end,closeDialog=function() dialogsClosed=dialogsClosed+1 end};o.widget=w;if o.on_open then o.on_open(w) end;return w end} end
 package.preload['english_popup']=function() return {show=function(o) popups[#popups+1]=o;return {} end} end
 local bars,confirms={},{}
 package.preload['english_ielts_bars']=function() return {
@@ -338,19 +338,37 @@ assert(speech.stops>0,'test audio stops speech')
 au.playing=true
 lr.plugin:getSpeech():speak('hello')
 assert(lastCall(au)[1]=='stop' and spoke[#spoke]=='hello','speech stops test audio')
+-- Study first open plays too; Study reopen stays paused (below)
+do local sr=lreader(dir..'/l.epub');ticks[#ticks]()
+  local sp=popups[#popups];sp.buttons(function() if sp.on_close then sp.on_close() end end)[1][2].callback()
+  local sa=audios[#audios]
+  assert(sr.plugin._ielts.session:mode()=='study' and sa.calls[1][1]=='play' and sa.calls[1][2]==0,'Study first open plays')
+  sr.plugin:onCloseDocument() end
 -- suspend saves position and stops, resume plays on (exam)
 au.pos=100;au.playing=true
 lr.plugin:onSuspend()
 assert(lastCall(au)[1]=='stop' and lst.session:audioPos()==100 and lst.session.startedAt==nil,'suspend: stop, save pos, pause clock')
 lr.plugin:onResume()
 assert(lastCall(au)[1]=='play' and lastCall(au)[2]==100,'resume plays on in exam')
--- audio ends: pos=end, open panel redrawn, auto-finish 120 s later
-local rf=refreshes
-au.playing=false;au.on_end()
-assert(lst.session:audioPos()==300 and refreshes==rf+1,'ended: position saved, open panel refreshed')
+-- audio ends: pos=end, open panel updated in place, countdown = check time, auto-finish 120 s later
+local rf,np0=refreshes,#panels
+au.playing=false;au.pos=300;au.on_end()
+assert(lst.session:audioPos()==300 and refreshes==rf+1 and #panels==np0,'ended: position saved, panel updated in place')
+assert(lp.exam_left()==120,'check time counts down from 2:00')
 local auto=assert(find120(),'auto-finish scheduled at 120 s')
-np=#panels
+clock=clock+50;assert(lp.exam_left()==70,'countdown follows the clock')
+-- suspend in the check window: unscheduled, left saved; resume re-arms the remainder (not a fresh 120)
+local un0=unscheduled
+lr.plugin:onSuspend();assert(unscheduled>un0 and lst.session:checkLeft()==70,'suspend saves check time')
+clock=clock+500
+lr.plugin:onResume();assert(scheduled[#scheduled][1]==70 and lp.exam_left()==70,'resume re-arms the remainder')
+scheduled[#scheduled][1]=70
+clock=clock+70;assert(lp.exam_left()==0,'never negative')
+clock=clock+10;assert(lp.exam_left()==0,'never negative')
+np=#panels;local dc=dialogsClosed
+auto=scheduled[#scheduled]
 auto[2]()
+assert(dialogsClosed==dc+1,'auto-finish closes an open gap dialog')
 assert(lst.session:finished() and lst.session.startedAt==nil and panels[#panels].results==true and #panels==np+1,'auto-finish scores')
 assert(closed[#closed]==lp.widget,'old panel closed before results')
 -- Finish by hand stops audio and cancels the auto-finish
@@ -360,11 +378,23 @@ assert(au2.calls[1][1]=='play' and au2.calls[1][2]==50,'reopen exam: plays from 
 local un=unscheduled;panels[#panels].on_finish()
 assert(lastCall(au2)[1]=='stop' and unscheduled>un,'on_finish stops audio and unschedules')
 -- Reopen exam after the audio ended: no playback, finishes 120 s later
-local lr3=lreader(dir..'/l.epub',{mode='practice',answers={},elapsed=0,audio_pos=300});ticks[#ticks]()
+local lr3=lreader(dir..'/l.epub',{mode='practice',answers={},elapsed=0,audio_pos=300,check_left=45});ticks[#ticks]()
 local au3=audios[#audios]
-assert(#au3.calls==0 and panels[#panels].exam_left()==120,'reopen after end: no play, 2:00 left')
-find120()[2]()
+assert(#au3.calls==0 and panels[#panels].exam_left()==45,'reopen after end: no play, saved check time left')
+assert(scheduled[#scheduled][1]==45)
+scheduled[#scheduled][2]()
 assert(lr3.plugin._ielts.session:finished() and panels[#panels].results==true,'reopen after end finishes')
+-- Try again: audio back to 0, check time cleared; exam plays again
+local lr7=lreader(dir..'/l.epub',{mode='practice',answers={},elapsed=0,audio_pos=300,check_left=45,finished=true});ticks[#ticks]()
+lr7.plugin:showQuestions();local au7=audios[#audios];local s7=lr7.plugin._ielts.session
+s7:reset();panels[#panels].on_retry()
+assert(s7:audioPos()==0 and s7:checkLeft()==nil and lastCall(au7)[1]=='play' and lastCall(au7)[2]==0,'Try again (exam) plays from 0')
+lr7.plugin:onCloseDocument()
+local lr8=lreader(dir..'/l.epub',{mode='study',answers={},elapsed=0,audio_pos=300,finished=true});ticks[#ticks]()
+lr8.plugin:showQuestions();local au8=audios[#audios];local s8=lr8.plugin._ielts.session
+s8:reset();panels[#panels].on_retry()
+assert(au8.pos==0 and s8:audioPos()==0 and lastCall(au8)[1]~='play','Try again (study) stays paused at 0')
+lr8.plugin:onCloseDocument()
 -- Study: paused until play; saved position kept
 local lr4=lreader(dir..'/l.epub',{mode='study',answers={},elapsed=0,audio_pos=50});ticks[#ticks]()
 local au4=audios[#audios]
