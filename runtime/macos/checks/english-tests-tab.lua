@@ -93,7 +93,7 @@ A.open('/b/IELTS/t1.epub')
 assert(opened[#opened]=='/b/IELTS/t1.epub','Start/Continue opens the test')
 -- Retry: confirm, then clear answers keeping the mode, then open.
 sidecars['/b/IELTS/t2.epub']=store()
-sidecars['/b/IELTS/t2.epub'].data.leaf_ielts={mode='practice',answers={'x'},elapsed=99,finished=true}
+sidecars['/b/IELTS/t2.epub'].data.leaf_ielts={mode='practice',answers={'x'},elapsed=99,finished=true,margins_added=true}
 local n=#opened
 A.retry('/b/IELTS/t2.epub')
 local box=shown[#shown]
@@ -102,6 +102,7 @@ assert(#opened==n and sidecars['/b/IELTS/t2.epub'].data.leaf_ielts.finished,'not
 box.ok_callback()
 local rec=sidecars['/b/IELTS/t2.epub'].data.leaf_ielts
 assert(rec.mode=='practice' and next(rec.answers)==nil and rec.elapsed==0 and not rec.finished,'cleared except mode')
+assert(rec.margins_added==true,'retry keeps the margins flag, so margins are not added twice')
 assert(sidecars['/b/IELTS/t2.epub'].data._flushed,'sidecar flushed')
 assert(opened[#opened]=='/b/IELTS/t2.epub','retry opens the test')
 print('PASS: Retry asks, clears answers keeping the mode, then opens the test')

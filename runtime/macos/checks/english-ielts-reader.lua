@@ -1,4 +1,4 @@
--- IELTS wiring in main.lua: detection, footer, panel, word pick, evidence, time-up. arg[1] = plugin dir.
+-- IELTS wiring in main.lua: detection, bars, margins, panel, word pick, evidence, time-up. arg[1] = plugin dir.
 package.path=assert(arg[1])..'/?.lua;'..package.path
 local J=require('json')
 local f=assert(io.open(arg[1]..'/../../../../ielts-sample.json'));local raw=f:read('*a');f:close()
@@ -24,6 +24,16 @@ package.preload['ffi/blitbuffer']=function() return {COLOR_WHITE=255} end
 local panels,popups,panelBoom={},{},false
 package.preload['english_ielts_panel']=function() return {show=function(o) if panelBoom then error('bad test') end;panels[#panels+1]=o;return {panel=true} end} end
 package.preload['english_popup']=function() return {show=function(o) popups[#popups+1]=o;return {} end} end
+local bars,confirms={},{}
+package.preload['english_ielts_bars']=function() return {
+  overlay=function(o) local h={o=o}
+    function h:update(n) assert(not self.closed,'update after close');self.o=n end
+    function h:heights() return 48,48 end
+    function h:close() self.closed=true end
+    bars[#bars+1]=h;return h end,
+  confirmFinish=function(on_yes) confirms[#confirms+1]=on_yes end} end
+local function live() local b=bars[#bars];return b and not b.closed and b or nil end
+local function margins(r) local k=0 for _,e in ipairs(r.events) do if e.handler=='onSetPageTopMargin' or e.handler=='onSetPageBottomMargin' then k=k+1 end end return k end
 local Preview=assert(loadfile(arg[1]..'/main.lua'))()
 
 local function walk(x,fn,seen) seen=seen or {}
@@ -39,7 +49,7 @@ local function reader(content)
     clear=function(h) r.clears=r.clears+1;h.selected_text=nil end,
     view={screenToPageTransform=function(_,p) return p end},
     onTap=function() end,
-    onHold=function(h) h.selected_text={text=r.word or 'reluctantly'};return true end,
+    onHold=function(h) local w=r.word or 'reluctantly';h.selected_text={text=w,pos0='p0:'..w,pos1='p1:'..w};return true end,
     _resetHoldTimer=function() end,
     lookupDictWord=function(h) r.tapped=h.selected_text.text end,
   }
@@ -75,91 +85,124 @@ local function reader(content)
     return {{start='/body/DocFragment[1]/body/p[3]/text().4',['end']='/body/DocFragment[1]/body/p[3]/text().40'},{start='/body/DocFragment[2]/body/p[1]/text().0',['end']='/body/DocFragment[2]/body/p[1]/text().9'}}
   end
   r.events={}
-  r.ui={menu={registerToMainMenu=function() end},handleEvent=function(_,e) r.events[#r.events+1]=e;if r.boom then error('boom') end;return true end,highlight=highlight,document=doc,doc_settings=r.store,
+  local typeset={unscaled_margins={10,15,10,20},configurable={t_page_margin=15,b_page_margin=20}}
+  r.ui={menu={registerToMainMenu=function() end},typeset=typeset,handleEvent=function(_,e) r.events[#r.events+1]=e;if r.boom then error('boom') end
+    if e.handler=='onSetPageTopMargin' then typeset.unscaled_margins[2]=e.args[1] end
+    if e.handler=='onSetPageBottomMargin' then typeset.unscaled_margins[4]=e.args[1] end
+    return true end,highlight=highlight,document=doc,doc_settings=r.store,
     dictionary={addToDictButtons=function() end},view={footer=footer},
     link={addCurrentLocationToStack=function() r.stacked=(r.stacked or 0)+1 end}}
   -- Like ReaderRolling: the jump emits PageUpdate synchronously.
   r.ui.rolling={onGotoXPointer=function(_,xp) r.gotos[#r.gotos+1]=xp;r.page=r.jumpTo or r.page
     if trace then trace[#trace+1]='goto' end;r.plugin:onPageUpdate(r.page) end}
-  doc.getTextFromXPointers=function(_,a,b,draw) if trace then trace[#trace+1]='draw:'..a..':'..b..':'..tostring(draw) end end
+  doc.getTextFromXPointers=function(_,a,b,draw) if draw then r.drawn=a..'|'..b end;if trace then trace[#trace+1]='draw:'..a..':'..b..':'..tostring(draw) end end
   r.plugin=setmetatable({ui=r.ui},{__index=Preview})
   r.plugin:init()
   r.tap=function(word) r.word=word;return highlight:onTap(nil,{pos={x=300,y=220}}) end
   return r
 end
 
--- Non-test books: nothing changes.
+-- Non-test books: nothing changes (no bars, no margins, native footer and taps).
 for _,content in ipairs({false,'{','{"version":2}'}) do
   local r=reader(content or nil)
   r.plugin:onReaderReady()
-  assert(r.plugin._ielts==nil and #r.added==0 and #popups==0,'non-test must not add ielts state')
+  assert(r.plugin._ielts==nil and #r.added==0 and #popups==0 and #bars==0 and #r.events==0,'non-test must not add ielts state')
   assert(r.tap('reluctantly')==true and r.tapped=='reluctantly','non-test tap still opens dictionary')
   assert(r.footer:TapFooter()=='native' and r.footerTaps==1,'non-test footer tap stays native')
   r.plugin:onCloseDocument()
 end
-print('PASS: non-test books keep dictionary tap and native footer, no ielts state')
+print('PASS: non-test books: no bars, no margins, dictionary tap and native footer')
 
--- A test: footer, mode prompt, timer.
+-- A test: mode prompt first, then bars and margins; the footer is left alone.
 local r=reader(KEY)
 r.plugin:onReaderReady()
 local st=assert(r.plugin._ielts,'test detected')
-assert(#r.added==1 and r.added[1]()=='Q 0/6','study/no mode footer')
+assert(#r.added==0 and r.footer:TapFooter()=='native' and r.footerTaps==1,'no footer content, footer tap stays native')
+assert(live()==nil,'bars wait for the mode choice')
 local prompt=assert(popups[#popups],'mode prompt shown')
-local row=prompt.buttons(function() end)[1]
+local function closePrompt() if prompt.on_close then prompt.on_close() end end
+local row=prompt.buttons(closePrompt)[1]
 assert(row[1].text=='Practice' and row[2].text=='Study')
 row[1].callback()
-assert(st.session:mode()=='practice' and r.added[1]()=='Q 0/6 · 20:00','practice footer '..r.added[1]())
+assert(st.session:mode()=='practice')
+local bar=assert(live(),'bars shown after mode choice')
+assert(bar.o.tab=='passage' and bar.o.timer=='20:00' and not bar.o.pick,'passage tab, practice timer')
+local m=r.ui.typeset.unscaled_margins
+assert(m[1]==10 and m[2]==15+48 and m[3]==10 and m[4]==20+48,'bar heights added to user margins: '..table.concat(m,','))
+assert(r.ui.typeset.configurable.t_page_margin==63 and r.ui.typeset.configurable.b_page_margin==68,'margins saved with the book')
+assert(r.store.data.leaf_ielts.margins_added==true,'margins remembered')
+assert(margins(r)==2,'one top and one bottom margin event')
 clock=clock+65
-assert(r.added[1]()=='Q 0/6 · 18:55')
--- Footer tap opens the panel at the current chapter.
-assert(r.footer:TapFooter()==true and r.footerTaps==0 and panels[#panels].passage==1,'footer tap opens panel')
-panelBoom=true;assert(r.footer:TapFooter()==true,'a panel error from the footer tap is contained')
-r.plugin:showQuestions();panelBoom=false
--- One-word gap: tap "amber," fills Q5, no dictionary, panel reopened.
+scheduled[#scheduled][2]()
+assert(live()==bar and bar.o.timer=='18:55','minute tick refreshes the timer: '..tostring(bar.o.timer))
+-- Input outside the bars goes to the reader; reader errors are contained.
+local ev={handler='onGesture',args={{pos={x=300,y=300}}}}
+local nev=#r.events
+assert(bar.o.forward(ev)==true and r.events[#r.events]==ev and #r.events==nev+1,'forwarded to the reader')
+r.boom=true;assert(not bar.o.forward(ev),'reader error contained');r.boom=nil
+-- Questions → opens the panel at the current chapter; the reader bars close meanwhile.
+bar.o.on_questions()
+assert(bar.closed and live()==nil and panels[#panels].passage==1,'Questions opens the panel, bars closed')
+panels[#panels].on_passage()
+bar=assert(live(),'back to the passage: bars again')
+assert(bar.o.tab=='passage' and margins(r)==2,'margins not added again')
+panelBoom=true;r.plugin:showQuestions();panelBoom=false
+assert(live(),'a panel error leaves the bars up')
+-- Finish asks first; Cancel leaves the test running, Finish scores.
+bar=live()
+local nc,np=#confirms,#panels
+bar.o.on_finish()
+assert(#confirms==nc+1 and not st.session:finished() and st.session.startedAt,'Finish asks, nothing scored yet')
+assert(#panels==np and live()==bar,'Cancel: still on the passage')
+confirms[#confirms]()
+assert(st.session:finished() and st.session.startedAt==nil,'Finish pauses and finishes')
+assert(#panels==np+1 and panels[#panels].results==true and live()==nil,'results shown')
+st.session.rec.finished=nil;st.session:start(clock)
+panels[#panels].on_passage()
+-- One-word gap: tap "amber," fills Q5, no dictionary, word highlighted, panel reopened.
 local n0=#panels
 panels[#panels].on_pick(5,{x=0,y=120})
-assert(st.picking==5 and walk(shown[#shown],function(t) return t.text=='Q5 · tap words in the passage' end),'banner shown')
-assert(shown[#shown]==st.banner and st.banner._at.y==800-40 and st.banner._at.y>=800*0.94,'banner sits on the footer strip, not over passage text')
-assert(walk(st.banner,function(t) return t.text=='Type instead' end) and not walk(st.banner,function(t) return t.buttons end),'banner is one row, no button table')
+bar=assert(live())
+assert(st.picking==5 and bar.o.pick==5 and bar.o.on_done and bar.o.on_cancel,'pick form in the top bar')
 assert(r.tap('amber,')==true and st.session:answer(5)=='amber','one-word pick')
 assert(r.tapped==nil and r.clears>=1,'pick must not open the dictionary and must clear the selection')
-assert(st.picking==nil and #panels==n0+1 and panels[#panels].offset.y==120,'one-word gap returns to the panel at the same scroll')
--- Two-word gap: two taps, still picking until Done.
+assert(r.drawn=='p0:amber,|p1:amber,','picked word highlighted: '..tostring(r.drawn))
+assert(st.picking==nil and #panels==n0+1 and panels[#panels].offset.y==120 and live()==nil,'one-word gap returns to the panel at the same scroll')
+-- Two-word gap: two taps keep picking; Cancel restores the answer from before.
+st.session:setAnswer(6,'old')
 panels[#panels].on_pick(6)
 r.tap('motion');r.tap('“sensors”')
-assert(st.session:answer(6)=='motion sensors' and st.picking==6,'two-word pick keeps picking')
-assert(walk(shown[#shown],function(t) return t.text=='Q6 · motion sensors' end),'banner shows answer')
-local function bannerButton(l) return walk(shown[#shown],function(t) return t.text==l and t.callback end).callback end
-bannerButton('Clear')()
-assert(st.session:answer(6)=='' and st.picking==6)
+assert(st.session:answer(6)=='old motion sensors' and st.picking==6 and live().o.pick==6,'two-word pick keeps picking')
+assert(r.drawn=='p0:“sensors”|p1:“sensors”','last picked word highlighted')
+local n1,cl=#panels,r.cleared
+live().o.on_cancel()
+assert(st.session:answer(6)=='old' and st.picking==nil,'Cancel restores the previous answer')
+assert(#panels==n1+1 and r.cleared>cl and live()==nil,'Cancel returns to the panel and clears the highlight')
+st.session:setAnswer(6,'')
+panels[#panels].on_pick(6)
 r.tap('sensors’');r.tap('don’t.')
 assert(st.session:answer(6)=="sensors' don't",'bare word: apostrophes kept like answer matching, other edges stripped')
-local n1=#panels
-bannerButton('Done')()
-assert(st.picking==nil and #panels==n1+1 and r.tapped==nil,'Done returns to panel')
+n1=#panels
+live().o.on_done()
+assert(st.picking==nil and #panels==n1+1 and panels[#panels].passage and r.tapped==nil and st.session:answer(6)=="sensors' don't",'Done returns to the panel')
+panels[#panels].on_passage()
 -- After picking, taps look up words again.
 assert(r.tap('reluctantly')==true and r.tapped=='reluctantly')
 -- A failing pick must not break tapping.
 st.picking=99;r.tapped=nil
 assert(r.tap('word')==true and r.tapped==nil,'pick errors are contained')
 st.picking=nil
--- Banner: input outside it goes to the reader; its own area, broadcasts and reader errors stay put.
-panels[#panels].on_pick(6)
-local b=st.banner
-local function pos(inside) return {x=590,y=inside and 790 or 100} end
-b.dimen={x=0,y=760,w=300,h=40}
-assert(b:handleEvent({handler='onGesture',args={{pos=pos(false)}}})==true and #r.events==1,'tap outside forwarded')
-assert(b:handleEvent({handler='onGesture',args={{pos=pos(true)}}})==true and #r.events==1,'tap on banner kept')
-assert(b:handleEvent({handler='onKeyPress',args={}})==true and #r.events==2,'key page turn forwarded')
-assert(not b:handleEvent({handler='onPageUpdate',args={}}) and #r.events==2,'broadcasts not doubled')
-r.boom=true;assert(not b:handleEvent({handler='onKeyPress',args={}}),'reader error contained');r.boom=nil
-bannerButton('Done')()
-print('PASS: test footer and mode prompt, footer tap opens panel, word pick fills gaps without dictionary')
+-- No keyboard anywhere.
+local src=assert(io.open(arg[1]..'/main.lua')):read('*a')
+assert(not src:find('Type instead',1,true) and not src:find('ieltsType',1,true) and not src:find('ieltsBanner',1,true),'no Type instead')
+assert(not walk(shown,function(t) return t.text=='Type instead' end),'no Type instead shown')
+print('PASS: mode prompt then bars and margins, Questions/Finish from the bars, tap-only blanks with Cancel/Done')
 
 -- Evidence: straight-quote evidence finds a curly-quote passage, only inside the question's chapter.
 r.frag=2
 panels[#panels].on_evidence({n=5,evidence="replaced its white lamps with 'amber' ones"})
 assert(r.gotos[#r.gotos]=='/body/DocFragment[1]/body/p[3]/text().4','evidence jump in passage chapter: '..tostring(r.gotos[#r.gotos]))
+assert(live() and live().o.tab=='passage','Show in passage brings the bars back')
 local c=r.cleared
 r.plugin:onPageUpdate(7);assert(r.cleared==c,'same page keeps highlight')
 r.plugin:onPageUpdate(8);assert(r.cleared==c+1,'page turn clears evidence highlight')
@@ -201,12 +244,32 @@ st.session:finish();st.session:pause(clock);r.plugin:onResume()
 assert(st.session.startedAt==nil,'resume after Finish must not restart the clock')
 local r2=reader(KEY);r2.store.data.leaf_ielts=r.store.data.leaf_ielts;r2.plugin:onReaderReady()
 assert(r2.plugin._ielts and r2.plugin._ielts.session.startedAt==nil,'reopen after Finish must not restart the clock')
+local b2=assert(live(),'mode already chosen: bars shown on open')
+assert(margins(r2)==0 and r2.ui.typeset.unscaled_margins[2]==15,'margins added once across loads')
 r2.plugin:onCloseDocument()
+assert(b2.closed and r2.plugin._ielts==nil,'close closes the bars')
 st.session.rec.finished=nil;st.session:start(clock)
 -- Suspend/close persist elapsed; close removes footer and restores native taps.
-r.plugin:onSuspend();local e=st.session.rec.elapsed;clock=clock+500;r.plugin:onResume();clock=clock+10
+-- the reader of r is current again
+r.plugin:showIeltsBars()
+local b1=assert(live())
+r.plugin:onSuspend();local e=st.session.rec.elapsed;clock=clock+500
+assert(b1.closed and live()==nil,'suspend closes the bars')
+r.plugin:onResume();clock=clock+10
+local b3=assert(live(),'resume shows the bars again')
+-- Suspended in pick mode: the pick form comes back.
+panels[#panels].on_pick(6)
+r.plugin:onSuspend();assert(live()==nil);r.plugin:onResume()
+assert(live() and live().o.pick==6,'resume keeps the pick form')
+live().o.on_cancel()
+-- Suspended while the panel is open: no bars over it on resume.
+r.plugin:onSuspend();r.plugin:onResume()
+assert(live()==nil,'no bars over the questions panel after resume')
+panels[#panels].on_passage()
+b3=assert(live())
 r.plugin:onCloseDocument()
+assert(b3.closed and live()==nil,'close closes the bars')
 assert(st.session.rec.elapsed==e+10,'suspended time is not counted')
 assert(#r.added==0 and r.plugin._ielts==nil and unscheduled>0,'close cleans up')
 assert(r.footer:TapFooter()=='native','footer tap native after close')
-print('PASS: time-up message once, suspend/resume/close keep elapsed and clean up')
+print('PASS: time-up message once, suspend/resume/close keep elapsed, close/suspend bars, margins once')

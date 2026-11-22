@@ -34,5 +34,6 @@ c:start(0);c:pause(100);c:pause(200);c:start(300);c:pause(350);assert(c.rec.elap
 local p=S.new(tt,fake());p:setMode('practice');p:setAnswer(1,'x');p:start(0);assert(p:remaining(10)==1190 and p:footer(1180)=='Q 1/13 · 00:20')
 p:pause(1300);assert(p:remaining(1300)==0 and p:elapsed(1300)==1300,'elapsed is not capped at the limit');p:setAnswer(2,'y');assert(p:answer(2)=='y')
 assert(not p:timeUpNoticed());p:noteTimeUp();assert(S.new(tt,p.store):timeUpNoticed())
-p:finish();p:reset();assert(p:mode()=='practice' and p:answered()==0 and p.rec.elapsed==0 and not p:timeUpNoticed() and not p.rec.finished and p:footer(0)=='Q 0/13 · 20:00')
+assert(not p:marginsAdded());p:setMarginsAdded();assert(S.new(tt,p.store):marginsAdded(),'margins flag persisted')
+p:finish();p:reset();assert(p:marginsAdded(),'reset keeps the margins flag');assert(p:mode()=='practice' and p:answered()==0 and p.rec.elapsed==0 and not p:timeUpNoticed() and not p.rec.finished and p:footer(0)=='Q 0/13 · 20:00')
 print('PASS: ielts parse, normalize, gap/choice/multi scoring, per-passage totals, band estimate, session')

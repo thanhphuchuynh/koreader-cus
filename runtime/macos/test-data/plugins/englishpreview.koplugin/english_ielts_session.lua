@@ -53,8 +53,11 @@ function M:timeUpNoticed() return self.rec.timeUp==true end
 function M:noteTimeUp() self.rec.timeUp=true;self:save() end
 function M:finish() self.rec.finished=true;self:save() end
 function M:finished() return self.rec.finished==true end
+-- Test bars' height already added to the book's page margins (once per book, kept across Retry).
+function M:marginsAdded() return self.rec.margins_added==true end
+function M:setMarginsAdded() self.rec.margins_added=true;self:save() end
 function M:reset()
-  self.rec={mode=self.rec.mode,answers={},elapsed=0}
+  self.rec={mode=self.rec.mode,margins_added=self.rec.margins_added,answers={},elapsed=0}
   self.startedAt=nil;self:save()
 end
 

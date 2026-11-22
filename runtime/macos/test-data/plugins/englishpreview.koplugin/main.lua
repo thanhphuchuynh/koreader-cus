@@ -17,7 +17,8 @@ local test_actions={
             ok_text='Retry',cancel_text='Cancel',ok_callback=function()
                 local ds=require('docsettings'):open(path)
                 local rec=ds:readSetting('leaf_ielts')
-                ds:saveSetting('leaf_ielts',{mode=type(rec)=='table' and rec.mode or nil,answers={},elapsed=0}) -- as Session:reset
+                rec=type(rec)=='table' and rec or {}
+                ds:saveSetting('leaf_ielts',{mode=rec.mode,margins_added=rec.margins_added,answers={},elapsed=0}) -- as Session:reset
                 ds:flush()
                 logger.info('Leaf: tests retry',path)
                 openTest(path)
@@ -176,11 +177,14 @@ end
 
 function Preview:onSuspend()
     if self._speech then self._speech:stop() end
-    if self._ielts then self._ielts.session:pause(os.time()) end
+    if self._ielts then self._ielts.session:pause(os.time());self:hideIeltsBars() end
 end
 
 function Preview:onResume()
-    if self._ielts and not self._ielts.session:finished() then self._ielts.session:start(os.time()) end
+    local st=self._ielts
+    if not st then return end
+    if not st.session:finished() then st.session:start(os.time()) end
+    if not st.in_panel then self:showIeltsBars() end
 end
 
 -- IELTS Reading: a test EPUB carries META-INF/leaf-ielts.json. Any failure leaves the book as a normal book.
@@ -195,25 +199,12 @@ function Preview:loadIelts()
         if not test then logger.info('Leaf: ielts not a test',why);return end
         local session=require('english_ielts_session').new(test,self.ui.doc_settings)
         local st={test=test,session=session}
-        st.footer=function() return session:footer(os.time()) end
         st.tick=function() self:ieltsTick() end
         self._ielts=st
-        local footer=self.ui.view and self.ui.view.footer
-        if footer then
-            footer:addAdditionalFooterContent(st.footer);st.footer_added=footer
-            if not footer._leaf_ielts_tap then
-                footer._leaf_ielts_tap=true
-                local original=footer.TapFooter
-                footer.TapFooter=function(f,...)
-                    if self._ielts then self:showQuestions();return true end
-                    return original(f,...)
-                end
-            end
-        end
         if not session:finished() then session:start(os.time()) end
         UIManager:scheduleIn(60,st.tick)
         logger.info('Leaf: ielts test',test.total,'questions, mode',session:mode() or 'unset')
-        if not session:mode() then self:askIeltsMode() end
+        if session:mode() then self:showIeltsBars() else self:askIeltsMode() end
         -- Review: after the reader is on screen, or its first paint covers the panel.
         if review and review==self.ui.document.file and session:finished() then
             UIManager:scheduleIn(0.5,function() if self._ielts==st then self:showQuestions() end end)
@@ -225,27 +216,86 @@ end
 function Preview:closeIelts()
     local st=self._ielts
     if not st then return end
-    self._ielts=nil
     pcall(function()
+        self:hideIeltsBars()
         st.session:pause(os.time())
         UIManager:unschedule(st.tick)
-        if st.footer_added then st.footer_added:removeAdditionalFooterContent(st.footer) end
-        if st.banner then UIManager:close(st.banner) end
     end)
+    self._ielts=nil
 end
 
-function Preview:ieltsFooterRefresh()
-    local footer=self.ui.view and self.ui.view.footer
-    if footer and footer.maybeUpdateFooter then pcall(footer.maybeUpdateFooter,footer) end
+-- Test bars over the reader page: tabs + timer (or the pick form) on top, Questions →/Finish below.
+function Preview:ieltsBarOptions()
+    local st=self._ielts
+    local o={forward=function(event)
+        local ok,res=pcall(self.ui.handleEvent,self.ui,event)
+        if not ok then logger.info('Leaf: ielts error',res) end
+        return ok and res
+    end,
+    on_questions=function() if st.picking then self:ieltsPickDone() else self:showQuestions() end end,
+    on_finish=function() self:ieltsFinish() end}
+    if st.picking then
+        o.pick=st.picking
+        o.on_done=function() self:ieltsPickDone() end
+        o.on_cancel=function() self:ieltsPickCancel() end
+    else
+        o.tab='passage'
+        local left=st.session:remaining(os.time())
+        if left then o.timer=('%02d:%02d'):format(math.floor(left/60),left%60) end
+    end
+    return o
+end
+
+function Preview:showIeltsBars()
+    local st=self._ielts
+    if not st then return end
+    st.in_panel=nil
+    local ok,err=pcall(function()
+        if st.bars then st.bars:update(self:ieltsBarOptions());return end
+        st.bars=require('english_ielts_bars').overlay(self:ieltsBarOptions())
+        self:ieltsMargins(st.bars:heights())
+    end)
+    if not ok then logger.info('Leaf: ielts error',err) end
+end
+
+function Preview:hideIeltsBars()
+    local st=self._ielts
+    if st and st.bars then st.bars:close();st.bars=nil end
+end
+
+-- Once per book: make room for the bars by adding their height to the book's top/bottom margins.
+-- ReaderTypeset keeps margins unscaled (it applies scaleBySize), and saves them from `configurable`.
+function Preview:ieltsMargins(top_h,bottom_h)
+    local st,ts=self._ielts,self.ui.typeset
+    if st.session:marginsAdded() or not ts or not ts.unscaled_margins then return end
+    local Event=require('ui/event')
+    local function unscaled(px) return math.ceil(px*100/Screen:scaleBySize(100)) end
+    local t=ts.unscaled_margins[2]+unscaled(top_h)
+    local b=ts.unscaled_margins[4]+unscaled(bottom_h)
+    self.ui:handleEvent(Event:new('SetPageTopMargin',t))
+    self.ui:handleEvent(Event:new('SetPageBottomMargin',b))
+    if ts.configurable then ts.configurable.t_page_margin,ts.configurable.b_page_margin=t,b end
+    st.session:setMarginsAdded()
+    logger.info('Leaf: ielts margins',t,b)
+end
+
+function Preview:ieltsFinish()
+    local st=self._ielts
+    require('english_ielts_bars').confirmFinish(function()
+        if self._ielts~=st then return end
+        self:ieltsPickEnd()
+        st.session:pause(os.time());st.session:finish()
+        self:showQuestions()
+    end)
 end
 
 function Preview:askIeltsMode()
     local session=self._ielts.session
-    local function pick(mode,close)
-        session:setMode(mode);close();self:ieltsFooterRefresh()
-    end
+    local function pick(mode,close) session:setMode(mode);close() end
+    -- Bars come up however the prompt closes (a button or a tap outside).
     require('english_popup').show{title='IELTS Reading',
-        text='Practice: timed, like the real test.\nStudy: no timer.\nTap the footer to open the questions.',
+        text='Practice: timed, like the real test.\nStudy: no timer.\nTap Questions at the top to open the questions.',
+        on_close=function() self:showIeltsBars() end,
         buttons=function(close) return {{
             {text='Practice',callback=function() pick('practice',close) end},
             {text='Study',callback=function() pick('study',close) end},
@@ -257,7 +307,7 @@ function Preview:ieltsTick()
     local st=self._ielts
     if not st then return end
     local left=st.session:remaining(os.time())
-    if left then self:ieltsFooterRefresh() end
+    if left and st.bars then self:showIeltsBars() end
     if left==0 and not st.session:timeUpNoticed() then
         st.session:noteTimeUp()
         logger.info('Leaf: ielts time up')
@@ -273,6 +323,7 @@ function Preview:ieltsChapter()
     return math.max(1,math.min(k,#(self._ielts.test.passages or {})))
 end
 
+-- The panel draws its own bars, so the reader's close while it is open.
 function Preview:showQuestions(n,offset)
     local st=self._ielts
     if not st then return end
@@ -280,29 +331,45 @@ function Preview:showQuestions(n,offset)
     local ok,p=pcall(function() return n and I.passageOf(st.test,n) end)
     local passage=ok and p and p.n or self:ieltsChapter()
     logger.info('Leaf: ielts panel passage',passage)
-    -- Footer tap, English tools and returns from pick/evidence all land here: a bad test file must not crash the reader.
+    self:hideIeltsBars();st.in_panel=true
+    -- Bars, English tools and returns from pick/evidence all land here: a bad test file must not crash the reader.
     local ok,e=pcall(require('english_ielts_panel').show,{test=st.test,session=st.session,passage=passage,offset=offset,
         results=st.session:finished(),now=os.time,
         on_pick=function(q,off) self:ieltsPick(q,off) end,
-        on_passage=function() self:ieltsFooterRefresh() end,
-        on_evidence=function(q) self:showEvidence(q) end})
-    if not ok then logger.info('Leaf: ielts error',e) end
+        on_passage=function() self:showIeltsBars() end,
+        on_evidence=function(q) self:showIeltsBars();self:showEvidence(q) end})
+    if not ok then logger.info('Leaf: ielts error',e);self:showIeltsBars() end
 end
 
 function Preview:ieltsPick(n,offset)
     local st=self._ielts
-    st.picking,st.offset=n,offset
+    st.picking,st.offset,st.pick_before=n,offset,st.session:answer(n)
     logger.info('Leaf: ielts pick start',n)
-    self:ieltsBanner()
+    self:showIeltsBars()
+end
+
+-- Leave pick mode: drop the picked-word highlight.
+function Preview:ieltsPickEnd()
+    local st=self._ielts
+    if not st.picking then return end
+    st.picking,st.pick_before=nil,nil
+    if st.pick_drawn then st.pick_drawn=nil;pcall(self.ui.document.clearSelection,self.ui.document);UIManager:setDirty(nil,'ui') end
 end
 
 function Preview:ieltsPickDone()
     local st=self._ielts
     local n=st.picking
-    st.picking=nil
-    if st.banner then UIManager:close(st.banner);st.banner=nil end
+    self:ieltsPickEnd()
     logger.info('Leaf: ielts pick done',n,st.session:answer(n))
-    self:ieltsFooterRefresh()
+    self:showQuestions(n,st.offset)
+end
+
+function Preview:ieltsPickCancel()
+    local st=self._ielts
+    local n=st.picking
+    st.session:setAnswer(n,st.pick_before)
+    self:ieltsPickEnd()
+    logger.info('Leaf: ielts pick cancelled',n)
     self:showQuestions(n,st.offset)
 end
 
@@ -312,75 +379,19 @@ local function bareWord(s)
     return I.trim(I.fold(s))
 end
 
-function Preview:ieltsPickWord(text)
+function Preview:ieltsPickWord(text,pos0,pos1)
     local st=self._ielts
     local n,word=st.picking,bareWord(text)
     if word=='' then return end
     local a=st.session:answer(n)
     st.session:setAnswer(n,(a and a~='') and a..' '..word or word)
     logger.info('Leaf: ielts picked',n,word)
-    if st.test.byNumber[n].words==1 then self:ieltsPickDone() else self:ieltsBanner() end
-end
-
--- One-row non-modal banner over the footer strip (the tap hook ignores that strip, so no passage
--- word is hidden). Taps outside it go on to the reader (word taps, page turns).
-function Preview:ieltsBanner()
-    local st=self._ielts
-    local n=st.picking
-    if st.banner then UIManager:close(st.banner) end
-    local InputContainer=require('ui/widget/container/inputcontainer')
-    local FrameContainer=require('ui/widget/container/framecontainer')
-    local HorizontalGroup=require('ui/widget/horizontalgroup')
-    local TextWidget=require('ui/widget/textwidget')
-    local Button=require('ui/widget/button')
-    local Font=require('ui/font')
-    local Blitbuffer=require('ffi/blitbuffer')
-    local w,h,pad=Screen:getWidth(),Screen:getHeight(),Screen:scaleBySize(2)
-    local a=st.session:answer(n)
-    local banner=InputContainer:new{name='english_ielts_banner'}
-    local row=HorizontalGroup:new{align='center'}
-    local used=0
-    for _,b in ipairs({
-        {text='Done',callback=function() self:ieltsPickDone() end},
-        {text='Clear',callback=function() st.session:setAnswer(n,'');self:ieltsBanner() end},
-        {text='Type instead',callback=function() self:ieltsType() end},
-    }) do
-        local button=Button:new{text=b.text,callback=b.callback,text_font_size=16,padding_v=pad,show_parent=banner}
-        row[#row+1]=button;used=used+(button.getSize and button:getSize().w or 0)
+    if pos0 and pos1 then -- the last picked word stays highlighted, as evidence is drawn
+        self.ui.document:getTextFromXPointers(pos0,pos1,true)
+        st.pick_drawn=true
+        UIManager:setDirty(nil,'ui')
     end
-    table.insert(row,1,TextWidget:new{text=('Q%d · %s'):format(n,(a and a~='') and a or 'tap words in the passage'),
-        face=Font:getFace('cfont',16),max_width=math.max(w-used-4*pad-2,w/4)})
-    banner[1]=FrameContainer:new{padding=pad,bordersize=1,background=Blitbuffer.COLOR_WHITE,width=w,row}
-    local size=banner[1].getSize and banner[1]:getSize()
-    local handle=banner.handleEvent
-    banner.handleEvent=function(b,event)
-        if handle(b,event) then return true end
-        -- Input only: broadcasts already reach the reader directly, forwarding them would double them.
-        if event.handler~='onGesture' and event.handler~='onKeyPress' and event.handler~='onKeyRepeat' then return end
-        local ges=event.handler=='onGesture' and event.args and event.args[1]
-        -- The banner's whole strip (also beside its row) is its own: a footer tap there would open the panel mid-pick.
-        if b.dimen and ges and ges.pos and ges.pos.y>=b.dimen.y then return true end
-        local ok,res=pcall(self.ui.handleEvent,self.ui,event)
-        if not ok then logger.info('Leaf: ielts error',res) end
-        return ok and res
-    end
-    st.banner=banner
-    UIManager:show(banner,'ui',nil,0,h-(size and size.h or 0))
-end
-
-function Preview:ieltsType()
-    local st=self._ielts
-    local n=st.picking
-    local dialog
-    dialog=require('ui/widget/inputdialog'):new{title=('Question %d'):format(n),input=st.session:answer(n) or '',
-        buttons={{
-            {text='Cancel',id='close',callback=function() UIManager:close(dialog) end},
-            {text='Save',is_enter_default=true,callback=function()
-                st.session:setAnswer(n,dialog:getInputText());UIManager:close(dialog);self:ieltsPickDone()
-            end},
-        }}}
-    UIManager:show(dialog)
-    dialog:onShowKeyboard()
+    if st.test.byNumber[n].words==1 then self:ieltsPickDone() end
 end
 
 -- Jump to a question's evidence inside its passage chapter. findAllText searches the whole book
@@ -692,9 +703,9 @@ function Preview:installTapLookup()
         if owner:onHold(arg,ges) and owner.selected_text then
             owner:_resetHoldTimer(true)
             if self._ielts and self._ielts.picking then -- filling a gap: the word is the answer, not a lookup
-                local text = owner.selected_text.text
+                local sel = owner.selected_text
                 owner:clear()
-                local ok, err = pcall(self.ieltsPickWord, self, text)
+                local ok, err = pcall(self.ieltsPickWord, self, sel.text, sel.pos0, sel.pos1)
                 if not ok then logger.info('Leaf: ielts error', err) end
                 return true
             end
