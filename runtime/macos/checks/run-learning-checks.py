@@ -14,6 +14,7 @@ if (checks/'english-speech.lua').exists():cases.append(('english-speech.lua',plu
 if (checks/'english-voca.lua').exists():cases.append(('english-voca.lua',plugin))
 if (checks/'english-context.lua').exists():cases.append(('english-context.lua',plugin))
 if (checks/'english-ielts.lua').exists():cases.append(('english-ielts.lua',plugin))
+if (checks/'english-ielts-audio.lua').exists():cases.append(('english-ielts-audio.lua',plugin))
 if (checks/'english-ielts-panel.lua').exists():cases.append(('english-ielts-panel.lua',plugin))
 if (checks/'english-ielts-reader.lua').exists():cases.append(('english-ielts-reader.lua',plugin))
 if (checks/'english-ielts-bars.lua').exists():cases.append(('english-ielts-bars.lua',plugin))

@@ -32,6 +32,28 @@ function M.learn(model,chars,elapsed)
  if chars<40 then m.base=(m.base+elapsed)/2 else m.per=(m.per+math.max(0,elapsed-m.base)/chars)/2 end
  return m
 end
+function M.spawn(command)
+ local h=io.popen(command..' >/dev/null 2>&1 & echo $!')
+ local out=h and h:read('*a') or '';if h then h:close() end
+ return tonumber(out:match('%d+'))
+end
+local procfs=exists('/proc/self/stat')
+function M.alive(id)
+ if not id then return false end
+ if procfs then return exists('/proc/'..id..'/stat') end
+ return ok(os.execute('kill -0 '..id..' 2>/dev/null'))
+end
+function M.gstVersion()
+ for _,version in ipairs({'0.10','1.0'})do
+  if exists(M.bin_dir..'/gst-launch-'..version)then return version end
+ end
+end
+function M.musicFocus()
+ pcall(function()
+  local lipc=assert(require('liblipclua').init('com.github.koreadercus.speech'))
+  lipc:set_string_property('com.lab126.audiomgrd','setFocus','Music');lipc:close()
+ end)
+end
 M.now=function()
  local ok,util=pcall(require,'ffi/util')
  if ok and util.gettime then local s,us=util.gettime();return s+us/1e6 end
@@ -45,25 +67,9 @@ function M.new(dir)
  local self={}
  local pid,poll,completion,playing,generation=nil,nil,nil,false,0
  local function kindle()return type(Device.isKindle)=='function' and Device:isKindle() end
- local function gst()
-  for _,version in ipairs({'0.10','1.0'})do
-   if exists(M.bin_dir..'/gst-launch-'..version)then return version end
-  end
- end
  local function player()
-  if kindle() then return gst() end
+  if kindle() then return M.gstVersion() end
   if require('ffi').os=='OSX' and exists(M.bin_dir..'/afplay') then return 'afplay' end
- end
- local function spawn(command)
-  local h=io.popen(command..' >/dev/null 2>&1 & echo $!')
-  local out=h and h:read('*a') or '';if h then h:close() end
-  return tonumber(out:match('%d+'))
- end
- local procfs=exists('/proc/self/stat')
- local function alive(id)
-  if not id then return false end
-  if procfs then return exists('/proc/'..id..'/stat') end
-  return ok(os.execute('kill -0 '..id..' 2>/dev/null'))
  end
  local function finish(err)
   if poll then UI:unschedule(poll);poll=nil end
@@ -76,7 +82,7 @@ function M.new(dir)
   poll=function()
    poll=nil
    if my~=generation then return end
-   if alive(pid) then
+   if M.alive(pid) then
     if tick then tick() end
     if os.time()>deadline then os.execute('kill '..pid..' 2>/dev/null');finish('Speech took too long and was stopped.');return end
     return wait(deadline,next,my,tick)
@@ -104,7 +110,7 @@ function M.new(dir)
   os.remove(wav);os.remove(raw)
   local f=io.open(input,'wb');if not f then return nil,'Could not prepare speech.' end
   f:write(text);f:close()
-  pid=spawn('VOCA_HOME='..q(data)..' '..q(bin)..' -f '..q(input)..' -o '..q(wav))
+  pid=M.spawn('VOCA_HOME='..q(data)..' '..q(bin)..' -f '..q(input)..' -o '..q(wav))
   if not pid then return nil,'Could not start the offline voice.' end
   generation=generation+1
   local my=generation
@@ -130,17 +136,14 @@ function M.new(dir)
    else
     local o=io.open(raw,'wb');if not o then finish('Could not prepare speech audio.');return end
     o:write(pcm);o:close()
-    pcall(function()
-     local lipc=assert(require('liblipclua').init('com.github.koreadercus.speech'))
-     lipc:set_string_property('com.lab126.audiomgrd','setFocus','Music');lipc:close()
-    end)
+    M.musicFocus()
     local caps=how=='0.10'
      and ('audio/x-raw-int,endianness=1234,signed=true,width=16,depth=16,rate=%d,channels=%d'):format(rate,channels)
      or ('audio/x-raw,format=S16LE,rate=%d,channels=%d,layout=interleaved'):format(rate,channels)
     command=q(M.bin_dir..'/gst-launch-'..how)..' filesrc location='..q(raw)..' ! capsfilter caps='..q(caps)
      ..' ! mixersink stream-type=Music sync=true'
    end
-   pid=spawn(command)
+   pid=M.spawn(command)
    if not pid then finish('Could not play speech.');return end
    if on_start then on_start() end
    wait(os.time()+math.ceil(seconds)+10,function()finish(nil)end,my)

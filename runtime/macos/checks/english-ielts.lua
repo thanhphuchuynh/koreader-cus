@@ -6,6 +6,12 @@ local d=J.decode(raw);for _,p in ipairs(d.passages) do p.paragraphs=nil end
 local t=assert(I.parse(J.encode(d)))
 assert(t.total==6 and t.byNumber[4]==t.byNumber[3] and t.byNumber[5].answer=='amber' and I.passageOf(t,6).n==1 and I.passageOf(t,7)==nil)
 assert(I.parse('{')==nil and I.parse('{"version":2,"questions":[{}]}')==nil and I.parse('{"version":1,"questions":[]}')==nil)
+local L={version=1,skill='listening',audio={file='a.pcm',rate=16000,seconds=3.5},questions={{n=1,type='gap',answer='x',accept={'y'},at={1,2}}}}
+local lt=assert(I.parse(J.encode(L)))
+assert(lt.skill=='listening' and lt.audio.rate==16000 and lt.questions[1].at[2]==2 and lt.questions[1].accept[1]=='y')
+for _,bad in ipairs{false,'x',{file='a.pcm',rate=0,seconds=3},{file='a.pcm',rate=16000},{rate=16000,seconds=3},{file='../a.pcm',rate=16000,seconds=3}} do
+ L.audio=bad or nil;local r,e=I.parse(J.encode(L));assert(r==nil and e=='listening test without audio',tostring(e))
+end
 assert(I.normalize(' Footprints. ')=='footprints' and I.normalize('farmers’')=="farmers'" and I.normalize('A  –\n B')=='a - b')
 assert(I.fold('“A”  —  b’s')=='"A" - b\'s')
 local r=I.score(t,{[1]='true',[2]='TRUE',[3]={'B','A'},[5]=' Amber.',[6]='motion sensor'})

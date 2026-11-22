@@ -18,6 +18,11 @@ function M.parse(text)
   if not ok or type(t)~='table' then return nil,'invalid json' end
   if t.version~=1 then return nil,'unsupported version' end
   if type(t.questions)~='table' or #t.questions==0 then return nil,'no questions' end
+  if t.skill=='listening' then
+    local a=t.audio
+    if type(a)~='table' or type(a.file)~='string' or a.file=='' or a.file:find('[/\\%z]') or a.file:find('..',1,true)
+      or type(a.rate)~='number' or a.rate<=0 or type(a.seconds)~='number' or a.seconds<=0 then return nil,'listening test without audio' end
+  end
   t.byNumber,t.total={},0
   for _,q in ipairs(t.questions) do
     local n=q.n
