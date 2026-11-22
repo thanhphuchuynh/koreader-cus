@@ -44,6 +44,7 @@ local opts={test=test,session=session,passage=1,now=function() return 0 end,
 P.show(opts)
 assert(walk(shown[#shown],function(t) return t.text=='Questions' and t.preselect end) and button('Passage') and button('Finish') and button('← Passage'),'bars: Questions tab selected, bottom ← Passage + Finish')
 local dots=walk(shown[#shown],function(t) return type(t.text)=='string' and t.text:find('□',1,true) end)
+assert(dots.text:find(' 0/6',1,true),'count text')
 local _,a=dots.text:gsub('■','');local _,b=dots.text:gsub('□','');local count=a+b;assert(count==test.total,'dots='..count)
 assert(not button('Passage 1') and not has('[ Passage'),'single passage: no switch')
 local function selected(l) return walk(shown[#shown],function(t) return t.text==l and t.preselect end) end
@@ -69,6 +70,23 @@ local t2=assert(I.parse(J.encode(g)));local s2=S.new(t2,store())
 P.show({test=t2,session=s2,passage=1,on_pick=function()end,on_evidence=function()end,on_passage=function()end})
 assert(walk(shown[#shown],function(t) return t.text=='Passage 1' and t.preselect end) and button('Passage 2') and has('G1') and not has('G2'))
 button('Passage 2')();assert(has('G2') and not has('G1'))
+-- 40 questions over 3 passages: dots only for the shown passage, plus overall count
+local qs={};for i=1,40 do qs[i]={n=i,type='choice',options={'A','B'},answer='A',text='q'..i} end
+local g6={version=1,minutes=60,passages={{n=1,from=1,to=13},{n=2,from=14,to=26},{n=3,from=27,to=40}},questions=qs}
+local t6=assert(I.parse(J.encode(g6)));local s6=S.new(t6,store())
+P.show({test=t6,session=s6,passage=2,on_pick=function()end,on_evidence=function()end,on_passage=function()end})
+local dt=walk(shown[#shown],function(t) return type(t.text)=='string' and t.text:find('□',1,true) end).text
+local _,n1=dt:gsub('□','');local _,n2=dt:gsub('■','')
+assert(n1+n2<=14 and dt:find('0/40',1,true),'dots for the passage only + x/40: '..dt)
+-- Study: no timer; Practice: bar frame height matches Bars.height
+local Bars=require('english_ielts_bars')
+local topf=shown[#shown][1][1][1]
+assert(topf.height==Bars.height(),'top bar height')
+local function timer(w) return walk(w,function(t) return type(t.text)=='string' and t.text:match('^%d%d:%d%d$') end) end
+assert(not timer(shown[#shown]),'study: no timer')
+local s7=S.new(test,store());s7:setMode('practice');s7:start(0)
+P.show({test=test,session=s7,now=function() return 0 end,on_pick=function()end,on_evidence=function()end,on_passage=function()end})
+assert(timer(shown[#shown]),'practice: timer shown')
 -- results
 P.show(opts);session:setAnswer(1,'TRUE');button('Finish')();assert(#boxes==1 and not session:finished(),'Finish asks first')
 assert(not has('Band ≈'),'unconfirmed: no results')

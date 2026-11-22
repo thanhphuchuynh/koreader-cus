@@ -2,9 +2,11 @@
 -- and a non-modal overlay that shows both over the reader and hands everything else to the reader.
 local M={}
 
+function M.height() return require('device').screen:scaleBySize(48) end -- button = bar-2 tall + 1px border each side, tap target >= 44
+
 local function dims()
   local Screen=require('device').screen
-  local s=Screen:scaleBySize(48) -- bar height; button = bar-2 tall + 1px border each side, tap target >= 44
+  local s=M.height()
   return Screen:getWidth(),Screen:getHeight(),s
 end
 

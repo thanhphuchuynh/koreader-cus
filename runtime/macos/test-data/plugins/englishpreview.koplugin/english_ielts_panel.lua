@@ -82,7 +82,8 @@ function M.show(o)
     local pn=o.passage or 1
     local dots={}
     local ns={};for n in pairs(test.byNumber) do ns[#ns+1]=n end;table.sort(ns)
-    for _,n in ipairs(ns) do dots[#dots+1]=filled(n) and '■' or '□' end
+    local Pd=multi and test.passages[pn] or nil
+    for _,n in ipairs(ns) do if not Pd or n>=Pd.from and n<=Pd.to then dots[#dots+1]=filled(n) and '■' or '□' end end
     if multi then
       local head={}
       for _,p in ipairs(test.passages) do
@@ -90,7 +91,7 @@ function M.show(o)
       end
       choices(head)
     end
-    dotsText=table.concat(dots,' ')
+    dotsText=table.concat(dots,' ')..('  %d/%d'):format(session:answered(),test.total)
     local P=multi and test.passages[pn] or nil
     -- Gaps written as {n} inside a group's text are shown there; their rows stay short.
     local inline={}
@@ -164,7 +165,7 @@ function M.show(o)
     end},widget)
     dh=Screen:scaleBySize(30)
   end
-  local sh=Bars and h-2*Screen:scaleBySize(48)-dh or h -- bar height as in english_ielts_bars.lua
+  local sh=Bars and h-2*Bars.height()-dh or h
   local scroll=Scroll:new{dimen=Geom:new{w=w,h=sh},show_parent=widget,FrameContainer:new{padding=pad,bordersize=0,col}}
   widget._scroll=scroll;widget.cropping_widget=scroll
   if o.offset then scroll:setScrolledOffset(o.offset) end
