@@ -77,7 +77,7 @@ function M.defaultIO()
     readJson=function(p)
       local r=require('ffi/archiver').Reader:new()
       if not r:open(p) then return nil end
-      local ok,data=pcall(function() for _ in r:iterate() do end return r:extractToMemory('META-INF/leaf-ielts.json') end);r:close()
+      local ok,data=pcall(function() for e in r:iterate() do if e.path=='META-INF/leaf-ielts.json' then break end end return r:extractToMemory('META-INF/leaf-ielts.json') end);r:close()
       return ok and data or nil
     end,
     record=function(p) return require('docsettings'):open(p):readSetting('leaf_ielts') end,

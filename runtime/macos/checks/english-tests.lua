@@ -9,7 +9,7 @@ local one=J.encode{version=1,title='Alpha',minutes=20,passages={{n=1,from=1,to=6
 local three=J.encode{version=1,title='Beta',minutes=60,passages={{n=1,from=1,to=13},{n=2,from=14,to=26},{n=3,from=27,to=40}},questions=qs(40)}
 local files={['/t/a.epub']=one,['/t/b.epub']=three,['/t/bad.epub']='{',['/t/nil.epub']=false,['/t/err.epub']='ERR'}
 local recs,mt={},{}
-reads=0
+local reads=0
 local io_={list=function() return {'/t/a.epub','/t/b.epub','/t/bad.epub','/t/nil.epub','/t/err.epub'} end,
  stat=function(p) return {size=#(files[p] or ''),mtime=1} end,
  readJson=function(p) reads=reads+1 if files[p]=='ERR' then error('boom') end return files[p] or nil end,
@@ -36,6 +36,6 @@ local st0=io_.stat;io_.stat=function(p) local x=st0(p);x.mtime=2;return x end;T.
 assert(#T.scan('/nope',{list=function() error('no dir') end},0)==0)
 local repo=arg[1]..'/../../../..'
 local dir=os.tmpname();os.remove(dir);os.execute('mkdir -p '..dir..' && python3 '..repo..'/make-ielts-test.py '..repo..'/ielts-sample.json '..dir)
-local real=T.scan(dir,T.defaultIO(),0);assert(#real==1 and real[1].title=='Night lights and sea turtles' and real[1].state=='new','real epub scan')
-os.execute('rm -rf '..dir)
+local real=T.scan(dir,T.defaultIO(),0);os.execute('rm -rf '..dir)
+assert(#real==1 and real[1].title=='Night lights and sea turtles' and real[1].state=='new','real epub scan')
 print('PASS: tests tab scan, status, summary, continue, ordering')

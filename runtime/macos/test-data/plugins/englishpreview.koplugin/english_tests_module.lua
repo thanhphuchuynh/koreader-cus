@@ -4,18 +4,57 @@ local M={id='leaf_tests',name='Leaf · Tests',enabled_key='leaf_tests_enabled',d
 local function noop() end
 M.actions={open=noop,review=noop,retry=noop} -- wired by Leaf at startup
 M.io=nil -- checks inject a fake; default is built on first use (docsettings is not loadable at require time)
-M.now=os.time
 function M.getMenuItems() return nil end
 
 local dio
 local function defaultIO() dio=dio or Tests.defaultIO() return dio end
-local last -- {width, widget} left by getHeight for the next build
+local MAX_ROWS=6 -- ponytail: fixed cap, use engine height if a screen ever needs more
+local function clock(sec) return ('%02d:%02d'):format(math.floor(sec/60),sec%60) end
+local function status(it)
+  if it.state=='new' then return 'Not started' end
+  if it.state=='progress' then return ('%d/%d'):format(it.answered,it.total)..(it.remaining and ' · '..clock(it.remaining)..' left' or '') end
+  return ('%d/%d · Band ≈ %s'):format(it.right,it.total,it.band)..(it.rough and ' (rough)' or '')
+end
+-- The one action a compact row offers.
+local function primary(it)
+  if it.state=='new' then return 'Start','open' elseif it.state=='progress' then return 'Continue','open' end
+  return 'Review','review'
+end
+
+-- Every test in a KOReader Menu; an entry opens a dialog with the actions its state allows.
+local function showAll(items)
+  local UIManager=require('ui/uimanager')
+  local Menu=require('ui/widget/menu')
+  local ButtonDialog=require('ui/widget/buttondialog')
+  local menu
+  local list={}
+  for _,it in ipairs(Tests.ordered(items)) do
+    list[#list+1]={text=it.title..' · '..status(it),callback=function()
+      local dialog
+      local function b(t,act) return {text=t,callback=function() UIManager:close(dialog);UIManager:close(menu);M.actions[act](it.path) end} end
+      local row={b(primary(it))}
+      if it.state=='done' then row[2]=b('Retry','retry') end
+      dialog=ButtonDialog:new{title=it.title,buttons={row}}
+      UIManager:show(dialog)
+    end}
+  end
+  menu=Menu:new{title='Tests',item_table=list,covers_fullscreen=true,is_borderless=true,is_popout=false}
+  UIManager:show(menu)
+end
+
+local function homeDir()
+  local ok,h=pcall(function() return require('apps/filemanager/filemanagerutil').getHomeFolder() end)
+  return ok and h or '/mnt/us/documents'
+end
+
 local function build(w)
   local Screen=require('device').screen
   local VG=require('ui/widget/verticalgroup')
   local HG=require('ui/widget/horizontalgroup')
   local VS=require('ui/widget/verticalspan')
+  local HS=require('ui/widget/horizontalspan')
   local TB=require('ui/widget/textboxwidget')
+  local TW=require('ui/widget/textwidget')
   local Button=require('ui/widget/button')
   local Font=require('ui/font')
   local Blitbuffer=require('ffi/blitbuffer')
@@ -27,45 +66,53 @@ local function build(w)
   end
   local function gap(n) col[#col+1]=VS:new{width=n or pad} end
   local function label(s) gap();text(s,14,'cfont',nil,Blitbuffer.COLOR_DARK_GRAY) end
-  local home=G_reader_settings and G_reader_settings:readSetting('home_dir') or '/mnt/us/documents'
-  local items=Tests.scan(home..'/IELTS',M.io or defaultIO())
+  local items=Tests.scan(homeDir()..'/IELTS',M.io or defaultIO())
   if #items==0 then
     text('No tests yet — put test files in documents/IELTS')
     return col
   end
-  local function card(it)
+  local function card(it) -- the in-progress test to continue
     gap();text(it.title,20,'tfont');text(it.meta,15)
-    local buttons={}
-    local function b(t,fn) buttons[#buttons+1]=Button:new{text=t,height=btnH,width=math.floor((w-pad)/2),callback=function() fn(it.path) end} end
-    if it.state=='new' then
-      text('Not started',15);b('Start',function(p) M.actions.open(p) end)
-    elseif it.state=='progress' then
-      local d={};for i=1,math.min(it.total,13) do d[i]=i<=it.answered and '■' or '□' end
-      text(table.concat(d,' ')..(it.total>13 and ' …'..it.total or ''),15)
-      local left=it.remaining and ('%02d:%02d'):format(math.floor(it.remaining/60),it.remaining%60)
-      text(('In progress · %d/%d answered'):format(it.answered,it.total)..(left and ' · '..left..' left' or ''),15)
-      b('Continue',function(p) M.actions.open(p) end)
-    else
-      text(('%d/%d · Band ≈ %s'):format(it.right,it.total,it.band)..(it.rough and ' (rough)' or ''),15)
-      b('Review',function(p) M.actions.review(p) end);b('Retry',function(p) M.actions.retry(p) end)
-    end
-    local row=HG:new{};for _,x in ipairs(buttons) do row[#row+1]=x end
-    gap(math.floor(pad/2));col[#col+1]=row
+    local d={};for i=1,math.min(it.total,13) do d[i]=i<=it.answered and '■' or '□' end
+    text(table.concat(d,' ')..(it.total>13 and ' …'..it.total or ''),15)
+    text(('In progress · %d/%d answered'):format(it.answered,it.total)..(it.remaining and ' · '..clock(it.remaining)..' left' or ''),15)
+    gap(math.floor(pad/2))
+    col[#col+1]=Button:new{text='Continue',height=btnH,width=math.floor((w-pad)/2),callback=function() M.actions.open(it.path) end}
+  end
+  local bw=math.floor(w/4)
+  local function row(it) -- one line: title and status left, one button right
+    local t,act=primary(it)
+    local tw=w-bw-pad
+    gap(math.floor(pad/2))
+    col[#col+1]=HG:new{align='center',
+      VG:new{align='left',TW:new{text=it.title,face=Font:getFace('tfont',18),max_width=tw},
+        TW:new{text=status(it),face=Font:getFace('cfont',15),max_width=tw}},
+      HS:new{width=pad},
+      Button:new{text=t,height=btnH,width=bw,callback=function() M.actions[act](it.path) end}}
   end
   local s=Tests.summary(items)
   label('TESTS')
-  local cw=math.floor(w/3);local row=HG:new{}
+  local cw=math.floor(w/3);local srow=HG:new{}
   for _,c in ipairs{{s.count,'tests'},{s.finished,'finished'},{s.lastBand or '—','last band'}} do
     local cell=VG:new{align='left'}
     cell[1]=TB:new{text=tostring(c[1]),face=Font:getFace('tfont',24),width=cw}
     cell[2]=TB:new{text=c[2],face=Font:getFace('cfont',14),width=cw}
-    row[#row+1]=cell
+    srow[#srow+1]=cell
   end
-  col[#col+1]=row
+  col[#col+1]=srow
   local cont=Tests.continueItem(items)
   if cont then label('CONTINUE');card(cont) end
   label('ALL TESTS')
-  for _,it in ipairs(Tests.ordered(items)) do if it~=cont then card(it) end end
+  local shown,more=0,false
+  for _,it in ipairs(Tests.ordered(items)) do
+    if it~=cont then
+      if shown<MAX_ROWS then row(it);shown=shown+1 else more=true end
+    end
+  end
+  if more then
+    gap()
+    col[#col+1]=Button:new{text=('All tests (%d)'):format(#items),height=btnH,width=w,callback=function() showAll(items) end}
+  end
   return col
 end
 
@@ -82,17 +129,8 @@ local function width(ctx)
   return w
 end
 
--- getHeight builds and keeps the widget; the build that follows for the same width takes it (once), so data is never reused across renders.
-function M.build(w,ctx)
-  local l=last;last=nil
-  return l and l[1]==w and l[2] or build(w)
-end
-
-function M.getHeight(ctx)
-  local w=width(ctx)
-  local x=build(w)
-  last={w,x}
-  return x:getSize().h
-end
+function M.build(w,ctx) return build(w) end
+-- SimpleUI only calls build; kept for engines that measure first.
+function M.getHeight(ctx) return build(width(ctx)):getSize().h end
 
 return M
