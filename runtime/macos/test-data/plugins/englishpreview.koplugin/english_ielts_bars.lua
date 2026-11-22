@@ -4,12 +4,12 @@ local M={}
 
 local function dims()
   local Screen=require('device').screen
-  local s=Screen:scaleBySize(48) -- >= 44 px tap targets
+  local s=Screen:scaleBySize(48) -- bar height; button = bar-2 tall + 1px border each side, tap target >= 44
   return Screen:getWidth(),Screen:getHeight(),s
 end
 
 -- Equal-width row inside a 1px frame; `selected` buttons are inverted (preselect), as in english_ielts_panel.lua.
-local function row(w,items,extra)
+local function row(w,items,extra,parent)
   local Frame=require('ui/widget/container/framecontainer')
   local HGroup=require('ui/widget/horizontalgroup')
   local Button=require('ui/widget/button')
@@ -21,29 +21,30 @@ local function row(w,items,extra)
   local g=HGroup:new{align='center'}
   local lw=extra and extra.label and math.floor(w*0.4) or 0
   if lw>0 then g[#g+1]=TextWidget:new{text=extra.label,face=Font:getFace('cfont',18),max_width=lw} end
-  local bw=math.floor((w-lw-2)/#items)
+  local tw=extra and extra.timer and math.floor(w*0.25) or 0
+  local bw=math.floor((w-lw-tw-2)/#items)
   for _,b in ipairs(items) do
-    g[#g+1]=Button:new{text=b.text,callback=b.callback,preselect=b.selected,width=bw,height=bh-2,bordersize=1,show_parent=frame}
+    g[#g+1]=Button:new{text=b.text,callback=b.callback,preselect=b.selected,width=bw,height=bh-2,padding_v=0,margin=0,bordersize=1,show_parent=parent}
   end
-  if extra and extra.timer then g[#g+1]=TextWidget:new{text=extra.timer,face=Font:getFace('cfont',18)} end
+  if extra and extra.timer then g[#g+1]=TextWidget:new{text=extra.timer,face=Font:getFace('cfont',18),max_width=tw} end
   frame[1]=g
   return frame
 end
 
 local function call(f) return function() if f then f() end end end
 
-function M.top(w,o)
+function M.top(w,o,parent)
   if o.pick then
     return row(w,{{text='Done',callback=call(o.on_done)},{text='Cancel',callback=call(o.on_cancel)}},
-      {label=('Tap the word for Q%d'):format(o.pick)})
+      {label=('Tap the word for Q%d'):format(o.pick)},parent)
   end
   return row(w,{{text='Passage',selected=o.tab=='passage',callback=call(o.on_passage)},
-    {text='Questions',selected=o.tab=='questions',callback=call(o.on_questions)}},{timer=o.timer})
+    {text='Questions',selected=o.tab=='questions',callback=call(o.on_questions)}},{timer=o.timer},parent)
 end
 
-function M.bottom(w,o)
+function M.bottom(w,o,parent)
   local first=o.view=='questions' and {text='← Passage',callback=call(o.on_passage)} or {text='Questions →',callback=call(o.on_questions)}
-  return row(w,{first,{text='Finish',callback=call(o.on_finish)}})
+  return row(w,{first,{text='Finish',callback=call(o.on_finish)}},nil,parent)
 end
 
 function M.confirmFinish(on_yes)
@@ -63,7 +64,8 @@ function M.overlay(o)
   local top,bottom,ov
   local function region(y) return Geom:new{x=0,y=y,w=w,h=bar} end
   local function build()
-    top,bottom=M.top(w,o),M.bottom(w,o)
+    if ov[1] and ov[1].free then ov[1]:free() end
+    top,bottom=M.top(w,o,ov),M.bottom(w,o,ov)
     bottom.overlap_offset={0,h-bar}
     ov[1]=Overlap:new{dimen=Geom:new{x=0,y=0,w=w,h=h},top,bottom}
   end
