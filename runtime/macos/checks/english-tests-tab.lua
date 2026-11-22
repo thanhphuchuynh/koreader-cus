@@ -31,16 +31,23 @@ assert(G_reader_settings.data.leaf_tests_tab_done==nil,'no SimpleUI: tab setup n
 print('PASS: without SimpleUI the file manager starts and nothing is registered')
 
 -- Fake SimpleUI.
-local registered,screens,sui,tabs,max={},{},{},{'homescreen','home','history','sui_settings'},6
+local registered,screens,sui,tabs,max,qas={},{},{},{'homescreen','home','history','sui_settings'},6,{}
 package.preload['modules/moduleregistry']=function() return {register=function(m) registered[#registered+1]=m end} end
 package.preload['infra/sui_custom_screens']=function() return {
   create=function(name) local s={id='cs_'..(#screens+1),name=name};s.pfx='simpleui_cs_'..s.id..'_';s.layout_key='simpleui_layout_cs_'..s.id
-    screens[#screens+1]=s;return s end,
+    screens[#screens+1]=s;qas['open_custom_screen:'..s.id]=true;return s end,
+  get=function(id) for _,s in ipairs(screens) do if s.id==id then return s end end end,
   qaId=function(id) return 'open_custom_screen:'..id end} end
-package.preload['infra/sui_store']=function() return {readSetting=function(_,k) return sui[k] end,saveSetting=function(_,k,v) sui[k]=v end,flush=function() end} end
+local failAfter -- set: reading the tabs throws (a setup that fails half-way)
+package.preload['infra/sui_store']=function() return {
+  readSetting=function(_,k) if k=='simpleui_bar_tabs' then if failAfter then error('boom') end return tabs end return sui[k] end,
+  saveSetting=function(_,k,v) sui[k]=v end,flush=function() end} end
 local cache
+-- Like sui_config: Custom Screen tabs whose Quick Action is not registered yet are dropped.
 package.preload['infra/sui_config']=function() return {
-  loadTabConfig=function() cache=cache or {unpack(tabs)};return cache end,
+  loadTabConfig=function()
+    if not cache then cache={};for _,t in ipairs(tabs) do if not t:match('^open_custom_screen:') or qas[t] then cache[#cache+1]=t end end end
+    return cache end,
   saveTabConfig=function(t) cache=nil;tabs={unpack(t)} end,
   effectiveMaxTabs=function() return max end} end
 
@@ -115,3 +122,28 @@ assert(#panels==1 and panels[1].results==true,'review shows results')
 reader('/b/IELTS/t3.epub',done)
 assert(#panels==1,'review applies once')
 print('PASS: Review opens the test and shows its results once')
+
+-- Other Custom Screen tabs survive the first run, though SimpleUI has not registered their QAs yet.
+G_reader_settings=store();max=6;tabs={'homescreen','open_custom_screen:cs_old','home','history'};cache=nil
+fm()
+local tq='open_custom_screen:'..screens[#screens].id
+assert(table.concat(tabs,',')==table.concat({'homescreen',tq,'open_custom_screen:cs_old','home','history'},','),'kept: '..table.concat(tabs,','))
+print('PASS: first run keeps the other Custom Screen tabs')
+
+-- A run that failed half-way: the next run reuses its screen.
+G_reader_settings=store();tabs={'homescreen','home'};cache=nil
+local count=#screens
+failAfter=true;fm();failAfter=nil
+assert(#screens==count+1 and not G_reader_settings.data.leaf_tests_tab_done,'half-way run made a screen, not done')
+fm()
+assert(#screens==count+1,'screen reused, not duplicated')
+assert(tabs[2]=='open_custom_screen:'..screens[#screens].id and #tabs==3 and G_reader_settings.data.leaf_tests_tab_done,'tab added on retry')
+print('PASS: a half-way failed setup reuses its screen next time')
+
+-- A Review whose book opens as a non-test (or non-EPUB) never applies to a later open.
+A.review('/b/IELTS/t3.epub')
+local ui={menu={registerToMainMenu=function() end},dictionary={addToDictButtons=function() end},document={file='/b/IELTS/t3.epub'}}
+local p=setmetatable({ui=ui},{__index=Preview});p:init();p:onReaderReady()
+reader('/b/IELTS/t3.epub',done)
+assert(#panels==1,'stale review not applied')
+print('PASS: a pending Review is consumed by the next open, whatever it is')

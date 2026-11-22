@@ -185,9 +185,9 @@ end
 
 -- IELTS Reading: a test EPUB carries META-INF/leaf-ielts.json. Any failure leaves the book as a normal book.
 function Preview:loadIelts()
-    if not self.ui.rolling or not self.ui.document or not self.ui.document.getDocumentFileContent then return end
-    local review=pending_review
+    local review=pending_review -- taken on every open, so it can never apply to a later one
     pending_review=nil
+    if not self.ui.rolling or not self.ui.document or not self.ui.document.getDocumentFileContent then return end
     local ok,err=pcall(function()
         local raw=self.ui.document:getDocumentFileContent('META-INF/leaf-ielts.json')
         if not raw then return end
@@ -724,15 +724,30 @@ function Preview:installTestsTab()
     if G_reader_settings:isTrue('leaf_tests_tab_done') then return end
     local Screens=require('infra/sui_custom_screens')
     local Store,Config=require('infra/sui_store'),require('infra/sui_config')
-    local screen=Screens.create('Tests')
+    -- A run that failed half-way left its screen behind: reuse it.
+    local id=G_reader_settings:readSetting('leaf_tests_screen')
+    local screen=id and Screens.get(id)
+    if not screen then
+        screen=Screens.create('Tests')
+        G_reader_settings:saveSetting('leaf_tests_screen',screen.id)
+        G_reader_settings:flush()
+    end
     Store:saveSetting(screen.pfx..'leaf_tests_enabled',true)
     Store:saveSetting(screen.layout_key,{pages={{id=1,modules={'leaf_tests'}}}})
     Store:flush()
-    local tabs=Config.loadTabConfig()
-    if #tabs<Config.effectiveMaxTabs() then
+    -- Raw tabs, not loadTabConfig(): before SimpleUI's boot registers the other Custom Screens'
+    -- Quick Actions, loadTabConfig() drops their tabs, and saving that would delete them.
+    local raw=Store:readSetting('simpleui_bar_tabs')
+    local tabs={unpack(type(raw)=='table' and raw or Config.loadTabConfig())}
+    local qa=Screens.qaId(screen.id)
+    local present=false
+    for _,t in ipairs(tabs) do if t==qa then present=true end end
+    if present then
+        logger.info('Leaf: tests tab already there')
+    elseif #tabs<Config.effectiveMaxTabs() then
         local at=1
-        for i,id in ipairs(tabs) do if id=='homescreen' then at=i+1;break end end
-        table.insert(tabs,at,Screens.qaId(screen.id))
+        for i,t in ipairs(tabs) do if t=='homescreen' then at=i+1;break end end
+        table.insert(tabs,at,qa)
         Config.saveTabConfig(tabs)
         logger.info('Leaf: tests tab added at',at)
     else
