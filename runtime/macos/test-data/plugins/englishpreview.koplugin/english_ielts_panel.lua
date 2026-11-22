@@ -26,6 +26,7 @@ function M.show(o)
   local now=o.now or os.time
   local widget=InputContainer:new{name='english_ielts_panel',dimen=Geom:new{x=0,y=0,w=w,h=h}}
   local col=VerticalGroup:new{align='left'}
+  local dotsText
   local function text(s,size,face)
     col[#col+1]=TextBox:new{text=s,face=Font:getFace(face or 'cfont',size or 18),width=inner}
   end
@@ -82,13 +83,14 @@ function M.show(o)
     local dots={}
     local ns={};for n in pairs(test.byNumber) do ns[#ns+1]=n end;table.sort(ns)
     for _,n in ipairs(ns) do dots[#dots+1]=filled(n) and '■' or '□' end
-    local head={{text='← Passage',callback=function() UI:close(widget);o.on_passage() end}}
-    if multi then for _,p in ipairs(test.passages) do
-      head[#head+1]={text=('Passage %d'):format(p.n),callback=function() redraw{passage=p.n,offset=false} end,selected=p.n==pn}
-    end end
-    choices(head)
-    text(table.concat(dots,' ')..'   '..session:footer(now()),15)
-    gap()
+    if multi then
+      local head={}
+      for _,p in ipairs(test.passages) do
+        head[#head+1]={text=('Passage %d'):format(p.n),callback=function() redraw{passage=p.n,offset=false} end,selected=p.n==pn}
+      end
+      choices(head)
+    end
+    dotsText=table.concat(dots,' ')
     local P=multi and test.passages[pn] or nil
     -- Gaps written as {n} inside a group's text are shown there; their rows stay short.
     local inline={}
@@ -150,12 +152,29 @@ function M.show(o)
       question(q)
     end
     gap()
-    buttons{{text='Finish',callback=function() session:pause(now());session:finish();redraw{results=true,offset=false,refresh='full'} end}}
   end
-  local scroll=Scroll:new{dimen=Geom:new{w=w,h=h},show_parent=widget,FrameContainer:new{padding=pad,bordersize=0,col}}
+  local Bars,top,bottom,dh=nil,nil,nil,0
+  if not o.results then
+    Bars=require('english_ielts_bars')
+    local function toPassage() UI:close(widget);o.on_passage() end
+    local r=session:mode()=='practice' and session:remaining(now())
+    top=Bars.top(w,{tab='questions',timer=r and ('%02d:%02d'):format(math.floor(r/60),r%60) or nil,on_passage=toPassage},widget)
+    bottom=Bars.bottom(w,{view='questions',on_passage=toPassage,on_finish=function()
+      Bars.confirmFinish(function() session:pause(now());session:finish();redraw{results=true,offset=false,refresh='full'} end)
+    end},widget)
+    dh=Screen:scaleBySize(30)
+  end
+  local sh=Bars and h-2*Screen:scaleBySize(48)-dh or h -- bar height as in english_ielts_bars.lua
+  local scroll=Scroll:new{dimen=Geom:new{w=w,h=sh},show_parent=widget,FrameContainer:new{padding=pad,bordersize=0,col}}
   widget._scroll=scroll;widget.cropping_widget=scroll
   if o.offset then scroll:setScrolledOffset(o.offset) end
-  widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,scroll}
+  local body=scroll
+  if Bars then
+    body=VerticalGroup:new{align='left',top,
+      FrameContainer:new{padding=0,padding_left=pad,bordersize=0,height=dh,TextBox:new{text=dotsText,face=Font:getFace('cfont',15),width=inner}},
+      scroll,bottom}
+  end
+  widget[1]=FrameContainer:new{padding=0,bordersize=0,background=Blitbuffer.COLOR_WHITE,body}
   widget._col=col
   UI:show(widget,o.refresh or 'full')
   return widget

@@ -12,14 +12,18 @@ function Scroll:new(t) t=t or {};t.off={x=0,y=0};function t:getScrolledOffset() 
 local lastScroll
 package.preload['ui/uimanager']=function() return UI end
 package.preload['device']=function() return {screen={getWidth=function() return 600 end,getHeight=function() return 800 end,scaleBySize=function(_,s) return s end}} end
-for _,n in ipairs({'container/inputcontainer','container/framecontainer','button','horizontalgroup','verticalgroup','verticalspan','textboxwidget','buttontable'}) do
+for _,n in ipairs({'container/inputcontainer','container/framecontainer','button','horizontalgroup','verticalgroup','verticalspan','textboxwidget','textwidget','buttontable'}) do
   package.preload['ui/widget/'..n]=function() return Widget end
 end
 package.preload['ui/font']=function() return {getFace=function() return {} end} end
 package.preload['ffi/blitbuffer']=function() return {COLOR_WHITE=255} end
 package.preload['ui/geometry']=function() return Widget end
 package.preload['ui/widget/container/scrollablecontainer']=function() return Scroll end
+local boxes={}
+package.preload['ui/widget/confirmbox']=function() return {new=function(_,t) boxes[#boxes+1]=t;return t end} end
 local P=require('english_ielts_panel')
+local fin
+
 local S=require('english_ielts_session')
 local function store() local d={} return {readSetting=function(_,k) return d[k] end,saveSetting=function(_,k,v) d[k]=v end} end
 -- depth-first search of the widget tree
@@ -30,6 +34,7 @@ local function walk(x,fn,seen) seen=seen or {}
 end
 local function button(label) local b=walk(shown[#shown],function(t) return t.text==label and t.callback end);return b and b.callback end
 local function has(sub) return walk(shown[#shown],function(t) return type(t.text)=='string' and t.text:find(sub,1,true) end) end
+fin=function() button('Finish')();boxes[#boxes].ok_callback() end
 local d=J.decode(raw);for _,p in ipairs(d.passages) do p.paragraphs=nil end
 local test=assert(I.parse(J.encode(d)))
 local session=S.new(test,store());session:setMode('practice')
@@ -37,6 +42,7 @@ local picked,pickedOff,evidence,done
 local opts={test=test,session=session,passage=1,now=function() return 0 end,
   on_pick=function(n,off) picked=n;pickedOff=off end,on_evidence=function(q) evidence=q end,on_passage=function() done=true end}
 P.show(opts)
+assert(walk(shown[#shown],function(t) return t.text=='Questions' and t.preselect end) and button('Passage') and button('Finish') and button('← Passage'),'bars: Questions tab selected, bottom ← Passage + Finish')
 local dots=walk(shown[#shown],function(t) return type(t.text)=='string' and t.text:find('□',1,true) end)
 local _,a=dots.text:gsub('■','');local _,b=dots.text:gsub('□','');local count=a+b;assert(count==test.total,'dots='..count)
 assert(not button('Passage 1') and not has('[ Passage'),'single passage: no switch')
@@ -64,17 +70,19 @@ P.show({test=t2,session=s2,passage=1,on_pick=function()end,on_evidence=function(
 assert(walk(shown[#shown],function(t) return t.text=='Passage 1' and t.preselect end) and button('Passage 2') and has('G1') and not has('G2'))
 button('Passage 2')();assert(has('G2') and not has('G1'))
 -- results
-P.show(opts);session:setAnswer(1,'TRUE');button('Finish')()
+P.show(opts);session:setAnswer(1,'TRUE');button('Finish')();assert(#boxes==1 and not session:finished(),'Finish asks first')
+assert(not has('Band ≈'),'unconfirmed: no results')
+boxes[1].ok_callback()
 assert(has('/6') and has('Band ≈') and has('Time used 00:00') and has('✓ 1. TRUE'))
 closedW=nil;button('Show in passage')();assert(evidence==test.byNumber[1] and closedW==shown[#shown],'evidence closes panel')
 button('Try again')();assert(session:answered()==0 and button('Finish') and session.startedAt~=nil,'Try again restarts the clock')
 assert(modes[#modes]=='ui','Try again redraw is ui')
-button('Finish')();button('Done')();assert(done)
-session:reset();P.show(opts);button('Finish')();assert(modes[#modes]=='full','entering results is a full refresh')
+fin();button('Done')();assert(done)
+session:reset();P.show(opts);fin();assert(modes[#modes]=='full','entering results is a full refresh')
 -- Time used counts real elapsed time, past the limit.
 local s3=S.new(test,store());s3:setMode('practice');s3:start(0)
 P.show({test=test,session=s3,now=function() return 1300 end,on_pick=function()end,on_evidence=function()end,on_passage=function()end})
-button('Finish')();assert(has('Time used 21:40'),'time used not capped')
+fin();assert(has('Time used 21:40'),'time used not capped')
 -- Gap prompt: text above, before ____ after on the row; answer replaces the blank, flagged when over the limit.
 local g3={version=1,minutes=20,passages={{n=1,from=1,to=4}},groups={{from=3,to=3,title='G3',instructions='i'}},
   questions={{n=1,type='gap',words=1,text='Table: elephants',before='counts of elephant',after='at night',answer='footprints'},
