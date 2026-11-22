@@ -370,12 +370,14 @@ function Preview:startListening()
     local session=st.session
     local function go(first)
         if not session:mode() then session:setMode('study') end -- prompt dismissed without a choice: no clock
+        if st.panel and not st.panel._closed then UIManager:close(st.panel) end -- redrawn in the chosen mode
         self:showQuestions()
         if st.audio and (first or session:mode()=='practice') then self:ieltsPlayOn() end -- Study reopen: paused until play
     end
     if session:mode() then return go() end
     local done=false
     local function once() if not done then done=true;go(true) end end
+    self:showQuestions() -- the prompt sits over the questions: the transcript holds the answers
     require('english_popup').show{title='IELTS Listening',
         text='Exam: the audio plays once, timed.\nStudy: pause, go back 10 s, replay a question.',
         on_close=once,

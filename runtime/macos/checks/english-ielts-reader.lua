@@ -316,8 +316,10 @@ local nb,na,npop=#bars,#audios,#popups
 local lr=lreader(dir..'/l.epub')
 local lst=lr.plugin._ielts
 assert(lst and #popups==npop and #panels>=0,'prompt waits for the tick')
+local np0=#panels
 ticks[#ticks]()
 local pr=popups[#popups]
+assert(#panels==np0+1,'the prompt sits over the questions panel, never over the transcript (it holds the answers)')
 assert(#popups==npop+1 and pr.title=='IELTS Listening' and pr.buttons(function() end)[1][1].text=='Exam' and pr.buttons(function() end)[1][2].text=='Study','mode prompt copy')
 assert(#bars==nb and #audios==na+1,'no reading bars; audio built')
 local au=audios[#audios]
