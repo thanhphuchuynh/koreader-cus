@@ -57,10 +57,16 @@ assert(shown[#shown]._scroll.off.y==250 and shown[#shown].cropping_widget==shown
 button('B')();button('A')();button('C')()
 assert(#session:answer(3)==2 and session:answer(3)[1]=='B','multi capped at picks')
 button('B')();assert(#session:answer(3)==1)
-local closedW;UI.close=function(_,w) closedW=w end
+local closedW,closedMode;UI.close=function(_,w,mode) closedW=w;closedMode=mode end
 local before=shown[#shown];before._scroll.off={x=0,y=40}
 button('6  ____')() ;assert(picked==6 and pickedOff.y==40 and closedW==before,'gap tap closes panel, passes scroll')
-button('← Passage')();assert(done)
+-- Leaving the panel for the passage must refresh the screen, or the panel ghosts on E Ink
+-- (UIManager:close with no refresh type repaints the reader but never updates the display).
+assert(closedMode=='full','gap tap → passage must refresh the screen')
+P.show(opts);closedMode=nil
+button('← Passage')();assert(done and closedMode=='full','← Passage must refresh the screen')
+P.show(opts);closedMode=nil
+button('Passage')();assert(closedMode=='full','Passage tab must refresh the screen')
 session:setAnswer(5,'ember');session:setAnswer(6,'three big words');P.show(opts)
 assert(has('ember') and has('three big words !'))
 -- two-passage fixture shows the switch

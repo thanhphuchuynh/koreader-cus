@@ -72,11 +72,11 @@ function M.show(o)
     for _,row in ipairs(r.rows) do
       local ans=row.answer~='' and row.answer or '—'
       text(row.ok and ('✓ %d. %s'):format(row.n,ans) or ('✗ %d. %s → %s'):format(row.n,ans,row.correct))
-      buttons{{text='Show in passage',callback=function() UI:close(widget);o.on_evidence(test.byNumber[row.n]) end}}
+      buttons{{text='Show in passage',callback=function() UI:close(widget,'full');o.on_evidence(test.byNumber[row.n]) end}}
     end
     gap()
     buttons{{text='Try again',callback=function() session:reset();session:start(now());redraw{results=false,offset=false} end},
-      {text='Done',callback=function() UI:close(widget);o.on_passage() end}}
+      {text='Done',callback=function() UI:close(widget,'full');o.on_passage() end}}
   else
     local multi=#test.passages>1
     local pn=o.passage or 1
@@ -108,7 +108,7 @@ function M.show(o)
         if not inline[n] then label=((q.before or '')..' '..label..' '..(q.after or '')):match('^%s*(.-)%s*$') end
         buttons{{text=('%d  %s'):format(n,label),callback=function()
           local off=widget._scroll and widget._scroll:getScrolledOffset()
-          UI:close(widget);o.on_pick(n,off)
+          UI:close(widget,'full');o.on_pick(n,off)
         end}}
         return
       end
@@ -157,7 +157,8 @@ function M.show(o)
   local Bars,top,bottom,dh=nil,nil,nil,0
   if not o.results then
     Bars=require('english_ielts_bars')
-    local function toPassage() UI:close(widget);o.on_passage() end
+    -- 'full': closing with no refresh type repaints the reader but never updates the display (ghosting).
+    local function toPassage() UI:close(widget,'full');o.on_passage() end
     local r=session:mode()=='practice' and session:remaining(now())
     top=Bars.top(w,{tab='questions',timer=r and ('%02d:%02d'):format(math.floor(r/60),r%60) or nil,on_passage=toPassage},widget)
     bottom=Bars.bottom(w,{view='questions',on_passage=toPassage,on_finish=function()
