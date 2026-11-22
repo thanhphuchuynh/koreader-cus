@@ -16,6 +16,7 @@ if (checks/'english-context.lua').exists():cases.append(('english-context.lua',p
 if (checks/'english-ielts.lua').exists():cases.append(('english-ielts.lua',plugin))
 if (checks/'english-ielts-panel.lua').exists():cases.append(('english-ielts-panel.lua',plugin))
 if (checks/'english-ielts-reader.lua').exists():cases.append(('english-ielts-reader.lua',plugin))
+if (checks/'english-ielts-bars.lua').exists():cases.append(('english-ielts-bars.lua',plugin))
 if (checks/'english-phrases.lua').exists():cases.append(('english-phrases.lua',plugin))
 if (checks/'english-tests.lua').exists():cases.append(('english-tests.lua',plugin))
 if (checks/'english-tests-module.lua').exists():cases.append(('english-tests-module.lua',plugin))
