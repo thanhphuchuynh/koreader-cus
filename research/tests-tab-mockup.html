@@ -36,17 +36,17 @@ main{max-width:1240px;margin:auto;padding:14px 16px 32px;display:flex;gap:26px;f
 .summary div{padding:7px 4px;text-align:center;border-right:1px solid var(--line)}
 .summary div:last-child{border-right:0}
 .summary b{display:block;font:18px Georgia,serif}
-.summary span{font-size:10.5px;color:var(--muted)}
+.summary span{font-size:11px;color:var(--muted)}
 .full .top{display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--ink);padding:10px 12px;font:600 15px system-ui}
 .full .top button{border:0;background:none;font:13px system-ui;cursor:pointer;text-decoration:underline}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 10px;margin-top:6px}
 .cover{border:1px solid var(--ink);aspect-ratio:3/4;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:6px;font:11.5px/1.25 Georgia,serif;box-shadow:2px 2px 0 #bbb}
-.cover small{font:9px system-ui;color:var(--muted);margin-top:6px}
-.fname{font-size:10px;margin-top:4px;word-break:break-word}
+.cover small{font:11px system-ui;color:var(--muted);margin-top:6px}
+.fname{font-size:11px;margin-top:4px;word-break:break-word}
 .path{font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);padding:4px 0 6px}
 .note{font-size:12.5px;color:#333;margin-top:10px}
 .note b{font-weight:600}
-.pill{display:inline-block;border:1px solid var(--ink);font:10px system-ui;padding:0 5px;margin-left:4px}
+.pill{display:inline-block;border:1px solid var(--ink);font:11px system-ui;padding:0 5px;margin-left:4px}
 .placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font:13px system-ui;text-align:center;padding:20px}
 footer{max-width:1240px;margin:auto;padding:0 16px 28px;font-size:13px;color:var(--muted)}
 </style>
@@ -86,7 +86,7 @@ const tests=[
 ];
 const TABS=['Home','Tests','Library','History','Settings'];
 const st={A:'Tests',B:'Home',C:'Tests'};
-function dots(n,f){let h='<div class="dots">';for(let i=0;i<Math.min(n,13);i++)h+=`<span class="${i<f?'f':''}"></span>`;return h+(n>13?` <span style="border:0;width:auto;font-size:10px">…${n}</span>`:'')+'</div>'}
+function dots(n,f){let h='<div class="dots">';for(let i=0;i<Math.min(n,13);i++)h+=`<span class="${i<f?'f':''}"></span>`;return h+(n>13?` <span style="border:0;width:auto;font-size:11px">…${n}</span>`:'')+'</div>'}
 function card(x){
  if(x.state==='progress')return `<div class="test"><h3>${x.t}</h3><div class="meta">${x.m}</div>${dots(x.total,x.ans)}<div class="row"><span class="meta">In progress · ${x.ans}/${x.total} answered · 12:40 left</span><button class="btn primary">Continue</button></div></div>`;
  if(x.state==='done')return `<div class="test"><h3>${x.t}</h3><div class="meta">${x.m}</div><div class="row"><span><span class="score">${x.score}</span> <span class="meta">· Band ≈ ${x.band}</span></span><span><button class="btn">Review</button> <button class="btn">Retry</button></span></div></div>`;
