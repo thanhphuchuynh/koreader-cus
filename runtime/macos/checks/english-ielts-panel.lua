@@ -47,7 +47,7 @@ local picked,pickedOff,evidence,done
 local opts={test=test,session=session,passage=1,now=function() return 0 end,
   on_pick=function(n,off) picked=n;pickedOff=off end,on_evidence=function(q) evidence=q end,on_passage=function() done=true end}
 P.show(opts)
-assert(walk(shown[#shown],function(t) return t.text=='Questions' and t.preselect end) and button('Passage') and button('Finish') and button('← Passage'),'bars: Questions tab selected, bottom ← Passage + Finish')
+assert(walk(shown[#shown],function(t) return t.text=='Questions' and t.preselect end) and button('Passage') and button('Finish') and button('Close') and not button('← Passage'),'bars: Questions tab selected, bottom Close + Finish')
 local dots=walk(shown[#shown],function(t) return type(t.text)=='string' and t.text:find('□',1,true) end)
 assert(dots.text:find(' 0/6',1,true),'count text')
 local _,a=dots.text:gsub('■','');local _,b=dots.text:gsub('□','');local count=a+b;assert(count==test.total,'dots='..count)
@@ -70,7 +70,7 @@ button('6  ____')() ;assert(picked==6 and pickedOff.y==40 and closedW==before,'g
 -- (UIManager:close with no refresh type repaints the reader but never updates the display).
 assert(closedMode=='full','gap tap → passage must refresh the screen')
 P.show(opts);closedMode=nil
-button('← Passage')();assert(done and closedMode=='full','← Passage must refresh the screen')
+button('Passage')();assert(done and closedMode=='full','Passage tab must refresh the screen')
 P.show(opts);closedMode=nil
 button('Passage')();assert(closedMode=='full','Passage tab must refresh the screen')
 session:setAnswer(5,'ember');session:setAnswer(6,'three big words');P.show(opts)

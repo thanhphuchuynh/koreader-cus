@@ -42,10 +42,13 @@ t=B.top(600,{pick=7,on_done=function() done=true end,on_cancel=function() cancel
 assert(has(t,'Tap the word for Q7') and not btn(t,'Passage'));call(t,'Done');call(t,'Cancel');assert(done and cancel)
 -- bottom
 local f,q,p=0
-local b=B.bottom(600,{view='passage',on_questions=function() q=true end,on_finish=function() f=f+1 end,on_passage=function() p=true end})
-assert(btn(b,'Questions →') and btn(b,'Finish') and not btn(b,'← Passage'));call(b,'Questions →');call(b,'Finish');assert(q and f==1)
-b=B.bottom(600,{view='questions',on_passage=function() p=true end,on_finish=function() f=f+1 end})
-assert(btn(b,'← Passage') and btn(b,'Finish') and not btn(b,'Questions →'));call(b,'← Passage');assert(p)
+local left=0
+local b=B.bottom(600,{view='passage',on_questions=function() q=true end,on_finish=function() f=f+1 end,on_leave=function() left=left+1 end})
+assert(btn(b,'Close') and btn(b,'Finish') and not btn(b,'Questions →') and not btn(b,'← Passage'),'bottom: Close + Finish, no tab duplicates')
+local nb=#boxes;call(b,'Close');assert(left==0 and #boxes==nb+1 and boxes[#boxes].ok_text=='Leave' and boxes[#boxes].cancel_text=='Stay','Close asks first')
+boxes[#boxes].ok_callback();call(b,'Finish');assert(left==1 and f==1 and not q)
+b=B.bottom(600,{view='questions',on_finish=function() f=f+1 end,on_leave=function() left=left+1 end})
+assert(btn(b,'Close') and btn(b,'Finish') and not btn(b,'← Passage'));call(b,'Close');boxes[#boxes].ok_callback();assert(left==2)
 -- geometry: real Button is height+2*padding_v+2*bordersize tall (button.lua); must fit the bar; widths fit the screen; show_parent is the overlay
 local function fits(w)
   walk(w,function(x)
@@ -70,7 +73,7 @@ t=B.top(600,{title='Section 1'});assert(#t[1]==1 and t[1][1].dimen.w==600 and no
 local left=0
 b=B.bottom(600,{view='listening',on_finish=function() f=f+1 end,on_leave=function() left=left+1 end})
 assert(btn(b,'Finish') and btn(b,'Close') and not btn(b,'← Passage') and not btn(b,'Questions →') and #b[1]==2,'listening bottom: Close + Finish');call(b,'Finish')
-call(b,'Close');assert(left==1,'Close leaves the test')
+call(b,'Close');assert(left==0,'Close asks first');boxes[#boxes].ok_callback();assert(left==1,'Close leaves the test')
 t=B.top(600,{tab='passage',passage_label='Transcript'});assert(btn(t,'Transcript') and not btn(t,'Passage'),'passage_label')
 -- confirmFinish
 local yes=false
@@ -101,7 +104,7 @@ assert(has(ov,'02:00') and not has(ov,'01:00') and #dirty==nd+1 and dirty[#dirty
 nd=#dirty;h:update({pick=4,forward=o.forward});assert(#dirty==nd+2,'form change refreshes both bars')
 h:close();h:close();assert(#closed==1 and closed[1]==ov,'close once')
 -- finished test: the bottom bar leaves instead of finishing again
-local gone=0;b=B.bottom(600,{view='passage',finished=true,on_finish=function() error('finish on a finished test') end,on_leave=function() gone=gone+1 end})
-assert(has(b,'Close test') and not has(b,'Finish'),'finished: Close test, no Finish')
-walk(b,function(t) return t.text=='Close test' and t.callback end).callback();assert(gone==1,'Close test leaves')
+local gone,res=0,0;b=B.bottom(600,{view='passage',finished=true,on_finish=function() error('finish on a finished test') end,on_leave=function() gone=gone+1 end,on_questions=function() res=res+1 end})
+assert(btn(b,'Close') and btn(b,'Results') and not has(b,'Finish'),'finished: Close + Results, no Finish')
+nb=#boxes;call(b,'Close');call(b,'Results');assert(gone==1 and res==1 and #boxes==nb,'finished: Close leaves without asking; Results reopens the results')
 print('PASS')

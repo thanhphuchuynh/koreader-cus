@@ -203,7 +203,8 @@ function M.show(o)
       bottom=Bars.bottom(w,{view='listening',on_finish=finish,on_leave=function() widget:closeDialog();UI:close(widget,'full');if o.on_leave then o.on_leave() end end},widget)
     else
       top=Bars.top(w,{tab='questions',timer=r and mmss(r) or nil,on_passage=toPassage},widget)
-      bottom=Bars.bottom(w,{view='questions',on_passage=toPassage,on_finish=finish},widget)
+      bottom=Bars.bottom(w,{view='questions',on_finish=finish,
+        on_leave=function() widget:closeDialog();UI:close(widget,'full');if o.on_leave then o.on_leave() end end},widget)
     end
     dh=Screen:scaleBySize(30)
   end

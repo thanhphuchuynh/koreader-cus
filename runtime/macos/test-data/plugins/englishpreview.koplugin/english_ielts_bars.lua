@@ -1,4 +1,4 @@
--- IELTS test bars: top [Passage][Questions] + timer (or pick form), bottom [Questions →|← Passage][Finish],
+-- IELTS test bars: top [Passage][Questions] + timer (or pick form), bottom [Close][Finish|Results],
 -- and a non-modal overlay that shows both over the reader and hands everything else to the reader.
 local M={}
 
@@ -54,11 +54,19 @@ function M.top(w,o,parent)
 end
 
 function M.bottom(w,o,parent)
-  if o.view=='listening' then return row(w,{{text='Close',callback=call(o.on_leave)},{text='Finish',callback=call(o.on_finish)}},nil,parent) end
-  local first=o.view=='questions' and {text='← Passage',callback=call(o.on_passage)} or {text='Questions →',callback=call(o.on_questions)}
-  -- A finished test has nothing to finish: leave it instead (the reader's own menu sits under the bars).
-  local last=o.finished and {text='Close test',callback=call(o.on_leave)} or {text='Finish',callback=call(o.on_finish)}
-  return row(w,{first,last},nil,parent)
+  -- Close asks first while the test is open; a finished test leaves at once.
+  local close={text='Close',callback=o.finished and call(o.on_leave) or function() M.confirmLeave(call(o.on_leave)) end}
+  if o.view=='listening' then return row(w,{close,{text='Finish',callback=call(o.on_finish)}},nil,parent) end
+  -- Passage/Questions are the top bar's tabs; the bottom leaves the test (the reader's menu sits under the bars)
+  -- and finishes it, or, once finished, reopens the results.
+  local last=o.finished and {text='Results',callback=call(o.on_questions)} or {text='Finish',callback=call(o.on_finish)}
+  return row(w,{close,last},nil,parent)
+end
+
+function M.confirmLeave(on_yes)
+  local UI=require('ui/uimanager')
+  UI:show(require('ui/widget/confirmbox'):new{text='Leave this test?\nYour answers are saved — continue it later from the Tests tab.',
+    ok_text='Leave',cancel_text='Stay',ok_callback=on_yes})
 end
 
 function M.confirmFinish(on_yes)

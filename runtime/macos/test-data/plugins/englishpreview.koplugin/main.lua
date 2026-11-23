@@ -242,7 +242,7 @@ function Preview:closeIelts()
     self._ielts=nil
 end
 
--- Test bars over the reader page: tabs + timer (or the pick form) on top, Questions →/Finish below.
+-- Test bars over the reader page: tabs + timer (or the pick form) on top, Close/Finish (or Results) below.
 function Preview:ieltsBarOptions()
     local st=self._ielts
     local o={forward=function(event)
