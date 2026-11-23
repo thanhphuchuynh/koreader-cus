@@ -14,6 +14,7 @@ sentence (or **Paragraph**) with Google, **Use AI** for explanations, **Listen**
 - `runtime/build-phrases.py` — builds the offline idiom index from the en-en StarDict dictionary
 - `runtime/make-demo-epub.py` — writes `demo/leaf-demo.epub`, an original story for trying the features
 - `research/` — investigation report and mockups
+- `mac/LeafSend` — Mac app: drop books/tests, sends them to the Kindle over Wi-Fi (KOReader SSH); `make-app.sh` builds it
 - `docs/adding-tests.md` — how to add an IELTS or TOEIC test (JSON format, audio, build, copy to the Kindle)
 
 ## Not in the repo (rebuild or download)

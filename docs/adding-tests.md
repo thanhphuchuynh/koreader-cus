@@ -81,8 +81,16 @@ To see it before copying, start the Mac KOReader (`runtime/macos/Launch KOReader
 
 ## 5. Copy to the Kindle
 
-Copy the EPUB, and for listening its `.pcm`, into the Kindle folder from the table. Eject the Kindle
-before unplugging it. Open the Tests tab: the test appears in its folder.
+**Over Wi-Fi (Leaf Send):** build the Mac app once with `mac/LeafSend/make-app.sh` and open
+`mac/LeafSend/build/LeafSend.app`. First time only: plug the Kindle in by USB, tap **Set up key (USB)**,
+eject. Then on the Kindle start KOReader → Network → SSH server (or turn on its start-with-KOReader option),
+and drop EPUBs on the Leaf Send window: it finds the Kindle on your Wi-Fi and puts each test in its folder
+(a listening test's `.pcm` must sit next to its EPUB). Other books go to `documents/From Mac`.
+
+**By USB:** copy the EPUB, and for listening its `.pcm`, into the Kindle folder from the table. Eject the
+Kindle before unplugging it.
+
+Open the Tests tab: the test appears in its folder.
 
 ## Rules
 
