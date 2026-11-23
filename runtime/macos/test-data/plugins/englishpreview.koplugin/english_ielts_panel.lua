@@ -42,7 +42,7 @@ function M.show(o)
   -- Equal-width row; Button preselect = inverted (black fill, white text) for the selected one.
   local function choices(row)
     local g=HGroup:new{}
-    for _,b in ipairs(row) do g[#g+1]=Button:new{text=b.text,callback=b.callback,preselect=b.selected,width=math.floor(inner/#row),show_parent=widget} end
+    for _,b in ipairs(row) do g[#g+1]=Button:new{text=b.text,align=b.align,padding_h=b.align and pad or nil,callback=b.callback,preselect=b.selected,width=math.floor(inner/#row),show_parent=widget} end
     col[#col+1]=g
   end
   local function redraw(extra)
@@ -69,8 +69,8 @@ function M.show(o)
     text('Results',22,'tfont')
     text(('%d/%d'):format(r.right,r.total),22,'tfont')
     if #r.passages>1 then for _,p in ipairs(r.passages) do text(('Passage %d: %d/%d'):format(p.n,p.right,p.total)) end end
-    local band,rough=I.band(r.right,r.total)
-    text('Band ≈ '..band..(rough and ' (rough)' or ''))
+    if test.exam=='toeic' then text(('%d%% correct'):format(I.percent(r.right,r.total)))
+    else local band,rough=I.band(r.right,r.total);text('Band ≈ '..band..(rough and ' (rough)' or '')) end
     if session:mode()=='practice' then
       local used=session:elapsed(now())
       text(('Time used %02d:%02d'):format(math.floor(used/60),used%60))
@@ -81,12 +81,16 @@ function M.show(o)
       text(row.ok and ('✓ %d. %s'):format(row.n,ans) or ('✗ %d. %s → %s'):format(row.n,ans,row.correct))
       local q,b=test.byNumber[row.n],{}
       if L and q.at then b[#b+1]={text='▶ Hear it',callback=function() o.on_hear(q) end} end
-      b[#b+1]={text=L and 'Transcript' or 'Show in passage',callback=function() UI:close(widget,'full');o.on_evidence(q) end}
-      buttons(b)
+      -- TOEIC sets have no evidence in their book (a cover page): nothing to show there.
+      if q.evidence or test.exam~='toeic' then
+        b[#b+1]={text=L and 'Transcript' or 'Show in passage',callback=function() UI:close(widget,'full');o.on_evidence(q) end}
+      end
+      if #b>0 then buttons(b) end
     end
     gap()
     buttons{{text='Try again',callback=function() session:reset();if o.on_retry then o.on_retry() end;session:start(now());redraw{results=false,offset=false} end},
-      {text='Done',callback=function() UI:close(widget,'full');o.on_passage() end}}
+      {text='Done',callback=function() UI:close(widget,'full');o.on_passage() end},
+      {text='Close test',callback=function() UI:close(widget,'full');if o.on_leave then o.on_leave() end end}}
   else
     local multi=#(test.passages or {})>1
     local pn=o.passage or 1
@@ -138,6 +142,11 @@ function M.show(o)
       local sel,row={},{}
       local list=session:answer(n)
       if q.type=='multi' then for _,l in ipairs(list or {}) do sel[l]=true end elseif list then sel[list]=true end
+      -- TOEIC Part 1: the photo, fitted to the panel width and half its height. No photo: just the question.
+      local bb=q.image and o.image and o.image(q.image)
+      if bb then
+        col[#col+1]=require('ui/widget/imagewidget'):new{image=bb,width=inner,height=math.floor(h/2),scale_factor=0}
+      end
       text(('%s. %s'):format(type(q.n)=='table' and q.n[1]..'-'..q.n[#q.n] or n,q.text or ''))
       for _,opt in ipairs(q.options or {}) do
         row[#row+1]={text=opt,selected=sel[opt],callback=function()
@@ -150,7 +159,9 @@ function M.show(o)
           redraw()
         end}
       end
-      choices(row)
+      -- Letters fit one row; worded options (TOEIC "(C) are expected") get a full-width row each.
+      local chars=0;for _,b in ipairs(row) do chars=chars+#b.text end
+      if chars>28 then for _,b in ipairs(row) do b.align='left';choices{b} end else choices(row) end
     end
     -- Questions in number order; a group's header comes before its first question. Ungrouped ones show too.
     local qs={}

@@ -2,34 +2,48 @@
 local I=require('english_ielts')
 local S=require('english_ielts_session')
 local M={}
-local cache={} -- path..size..mtime -> parsed test (records are re-read every scan)
+local cache={} -- path -> {key=size|mtime, t=parsed test}
+local records={} -- path -> {mtime=sidecar mtime, rec=record}
 
 local function load(path,io)
   local st=io.stat(path);if not st then return nil end
-  local key=path..st.size..st.mtime
-  if cache[key]==nil then
+  local key=st.size..'|'..st.mtime
+  local c=cache[path]
+  if not c or c.key~=key then
     local ok,text=pcall(io.readJson,path)
-    local t=ok and type(text)=='string' and I.parse(text) or false
-    cache[key]=t
+    c={key=key,t=ok and type(text)=='string' and I.parse(text) or false}
+    cache[path]=c
   end
-  return cache[key] or nil
+  return c.t or nil
 end
 
 local function item(path,t,io)
-  local ok,rec=pcall(io.record,path)
-  if not ok or type(rec)~='table' then rec=nil end
+  local ok2,at=pcall(io.recordMtime,path)
+  at=ok2 and at or nil
+  -- ponytail: keyed by sidecar mtime (1-2 s on FAT); add size if a fast re-save is ever missed
+  local c=records[path]
+  if not c or c.mtime~=at then
+    local ok,rec=false,nil
+    if at then ok,rec=pcall(io.record,path) end
+    c={mtime=at,rec=ok and type(rec)=='table' and rec or nil}
+    records[path]=c
+  end
+  local rec=c.rec
   local answers={}
   if rec and type(rec.answers)=='table' then for n,v in pairs(rec.answers) do if t.byNumber[n] then answers[n]=v end end end
   local r=rec and {mode=rec.mode,answers=answers,elapsed=rec.elapsed,finished=rec.finished}
   local s=S.new(t,{readSetting=function() return r end})
-  local ok2,at=pcall(io.recordMtime,path)
   local it={path=path,title=t.title or path:match('[^/]*$'):gsub('%.epub$',''),total=t.total,minutes=t.minutes,
-    answered=s:answered(),active=ok2 and at or 0,state='new'}
+    answered=s:answered(),active=at or 0,state='new'}
   local L=t.skill=='listening'
-  it.meta=(L and 'Listening · ' or '')..('%d Q · %d min'):format(t.total,t.minutes)..(not L and #t.passages>1 and (' · %d passages'):format(#t.passages) or '')
+  it.folder=I.label(t);it.toeic=t.exam=='toeic';it.part=t.part
+  it.meta=(it.toeic and ('Part %d · '):format(t.part) or L and 'Listening · ' or '')..('%d Q'):format(t.total)
+    ..(t.minutes and (' · %d min'):format(t.minutes) or '')
+    ..(not L and #(t.passages or {})>1 and (' · %d passages'):format(#t.passages) or '')
   if s:finished() then
-    it.state='done';it.right=I.score(t,answers).right;it.band,it.rough=I.band(it.right,t.total)
-  elseif rec then it.state='progress';it.remaining=s:remaining(0) end
+    it.state='done';it.finishedAt=rec.finished_at or it.active;it.right=I.score(t,answers).right
+    if it.toeic then it.percent=I.percent(it.right,t.total) else it.band,it.rough=I.band(it.right,t.total) end
+  elseif rec then it.state='progress';it.remaining=not L and s:remaining(0) or nil end -- listening time is the audio's
   return it
 end
 
@@ -38,18 +52,33 @@ function M.scan(dir,io)
   local ok,paths=pcall(io.list,dir)
   for _,path in ipairs(ok and type(paths)=='table' and paths or {}) do
     local t=load(path,io)
-    if t then items[#items+1]=item(path,t,io) end
+    if t then -- one malformed test must not hide the others
+      local ok2,it=pcall(item,path,t,io)
+      if ok2 then items[#items+1]=it end
+    end
   end
   return items
 end
 
+-- count, finished, lastBand (IELTS: the latest finish), best (TOEIC: highest percent).
 function M.summary(items)
   local s={count=#items,finished=0}
   local at=-1
   for _,i in ipairs(items) do
-    if i.state=='done' then s.finished=s.finished+1;if i.active>at then at=i.active;s.lastBand=i.band end end
+    if i.state=='done' then
+      s.finished=s.finished+1
+      if i.band and i.finishedAt>at then at=i.finishedAt;s.lastBand=i.band end
+      if i.percent and (not s.best or i.percent>s.best) then s.best=i.percent end
+    end
   end
   return s
+end
+
+-- The items whose folder is `name` ('IELTS Listening', 'IELTS Reading', 'TOEIC Part 5').
+function M.inFolder(items,name)
+  local out={}
+  for _,i in ipairs(items) do if i.folder==name then out[#out+1]=i end end
+  return out
 end
 
 function M.continueItem(items)

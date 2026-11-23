@@ -7,18 +7,16 @@ local logger = require('logger')
 local Preview = WidgetContainer:extend{ name = 'englishpreview' }
 
 -- Tests tab (SimpleUI). Process-wide: the file manager's Preview is gone by the time the test opens.
-local tests_registered,pending_review=false,nil
-local function openTest(path) require('apps/reader/readerui'):showReader(path) end
+local tests_registered=false
+local function openTest(path,after_open) require('apps/reader/readerui'):showReader(path,nil,nil,nil,after_open) end
 local test_actions={
     open=openTest,
-    review=function(path) pending_review=path;openTest(path) end,
+    review=function(path) openTest(path,function(ui) if ui.englishpreview then ui.englishpreview:reviewIelts() end end) end,
     retry=function(path)
         UIManager:show(require('ui/widget/confirmbox'):new{text='Clear your answers for this test and start again?',
             ok_text='Retry',cancel_text='Cancel',ok_callback=function()
                 local ds=require('docsettings'):open(path)
-                local rec=ds:readSetting('leaf_ielts')
-                rec=type(rec)=='table' and rec or {}
-                ds:saveSetting('leaf_ielts',{mode=rec.mode,margins_added=rec.margins_added,answers={},elapsed=0}) -- as Session:reset
+                require('english_ielts_session').new(nil,ds):reset()
                 ds:flush()
                 logger.info('Leaf: tests retry',path)
                 openTest(path)
@@ -200,8 +198,6 @@ end
 
 -- IELTS Reading: a test EPUB carries META-INF/leaf-ielts.json. Any failure leaves the book as a normal book.
 function Preview:loadIelts()
-    local review=pending_review -- taken on every open, so it can never apply to a later one
-    pending_review=nil
     if not self.ui.rolling or not self.ui.document or not self.ui.document.getDocumentFileContent then return end
     local ok,err=pcall(function()
         local raw=self.ui.document:getDocumentFileContent('META-INF/leaf-ielts.json')
@@ -223,12 +219,15 @@ function Preview:loadIelts()
             else UIManager:nextTick(function() if self._ielts==st then self:showIeltsBars() end end) end
         elseif session:mode() then UIManager:nextTick(function() if self._ielts==st then self:showIeltsBars() end end)
         else self:askIeltsMode() end
-        -- Review: after the reader is on screen, or its first paint covers the panel.
-        if review and review==self.ui.document.file and session:finished() then
-            UIManager:scheduleIn(0.5,function() if self._ielts==st then self:showQuestions() end end)
-        end
     end)
     if not ok then logger.info('Leaf: ielts error',err);self:closeIelts() end
+end
+
+-- Tests tab Review: the results, after the reader is on screen, or its first paint covers the panel.
+function Preview:reviewIelts()
+    local st=self._ielts
+    if not st or not st.session:finished() then return end
+    UIManager:scheduleIn(0.5,function() if self._ielts==st then self:showQuestions() end end)
 end
 
 function Preview:closeIelts()
@@ -252,7 +251,8 @@ function Preview:ieltsBarOptions()
         return ok and res
     end,
     on_questions=function() if st.picking then self:ieltsPickDone() else self:showQuestions() end end,
-    on_finish=function() self:ieltsFinish() end}
+    on_finish=function() self:ieltsFinish() end,
+    on_leave=function() self.ui:onHome() end,finished=st.session:finished()}
     if st.picking then
         o.pick=st.picking
         o.on_done=function() self:ieltsPickDone() end
@@ -387,7 +387,7 @@ function Preview:startListening()
     local done=false
     local function once() if not done then done=true;go(true) end end
     self:showQuestions() -- the prompt sits over the questions: the transcript holds the answers
-    require('english_popup').show{title='IELTS Listening',
+    require('english_popup').show{title=require('english_ielts').label(st.test),
         text='Exam: the audio plays once, timed.\nStudy: pause, go back 10 s, replay a question.',
         on_close=once,
         buttons=function(close) return {{
@@ -423,7 +423,7 @@ function Preview:askIeltsMode()
     local session=self._ielts.session
     local function pick(mode,close) session:setMode(mode);close() end
     -- Bars come up however the prompt closes (a button or a tap outside).
-    require('english_popup').show{title='IELTS Reading',
+    require('english_popup').show{title=require('english_ielts').label(self._ielts.test),
         text='Practice: timed, like the real test.\nStudy: no timer.\nTap Questions at the top to open the questions.',
         on_close=function() self:showIeltsBars() end,
         buttons=function(close) return {{
@@ -466,6 +466,10 @@ function Preview:showQuestions(n,offset)
     -- Bars, English tools and returns from pick/evidence all land here: a bad test file must not crash the reader.
     local ok,e=pcall(require('english_ielts_panel').show,{test=st.test,session=st.session,passage=passage,offset=offset,
         results=st.session:finished(),now=os.time,
+        image=function(name) -- TOEIC Part 1 photos live in the book at OEBPS/images/<name>
+            local data=self.ui.document:getDocumentFileContent('OEBPS/images/'..name)
+            return data and require('ui/renderimage'):renderImageData(data,#data)
+        end,
         on_pick=function(q,off) self:ieltsPick(q,off) end,
         on_passage=function() self:showIeltsBars() end,
         on_evidence=function(q) self:showIeltsBars();self:showEvidence(q) end,
@@ -887,8 +891,7 @@ function Preview:installTestsTab()
         G_reader_settings:flush()
     end
     Store:saveSetting(screen.pfx..'leaf_tests_enabled',true)
-    Store:saveSetting(screen.layout_key,{pages={{id=1,modules={'leaf_tests'}}}})
-    Store:flush()
+    Store:saveSetting(screen.layout_key,{pages={{id=1,modules={'leaf_tests'}}}}) -- saveSetting flushes
     -- Raw tabs, not loadTabConfig(): before SimpleUI's boot registers the other Custom Screens'
     -- Quick Actions, loadTabConfig() drops their tabs, and saving that would delete them.
     local raw=Store:readSetting('simpleui_bar_tabs')
@@ -923,7 +926,7 @@ function Preview:init()
             Registry.register(mod)
             tests_registered=true
         end
-        self:installTestsTab()
+        if not self.ui.document then self:installTestsTab() end -- file manager only: its hint belongs there
     end)
     if not ok then logger.info('Leaf: tests tab error',err) end
     self.ui.menu:registerToMainMenu(self)

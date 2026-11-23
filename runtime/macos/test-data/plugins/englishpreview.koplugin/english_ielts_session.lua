@@ -55,7 +55,7 @@ end
 
 function M:timeUpNoticed() return self.rec.timeUp==true end
 function M:noteTimeUp() self.rec.timeUp=true;self:save() end
-function M:finish() self.rec.finished=true;self:save() end
+function M:finish() self.rec.finished=true;self.rec.finished_at=os.time();self:save() end
 function M:finished() return self.rec.finished==true end
 -- Test bars' height already added to the book's page margins (once per book, kept across Retry).
 function M:marginsAdded() return self.rec.margins_added==true end

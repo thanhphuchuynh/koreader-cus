@@ -23,6 +23,12 @@ function M.parse(text)
     if type(a)~='table' or type(a.file)~='string' or a.file=='' or a.file:find('[/\\%z]') or a.file:find('..',1,true)
       or type(a.rate)~='number' or a.rate<=0 or type(a.seconds)~='number' or a.seconds<=0 then return nil,'listening test without audio' end
   end
+  if t.exam~=nil then
+    if t.exam~='toeic' then return nil,'unknown exam' end
+    local p=t.part
+    if type(p)~='number' or p%1~=0 or p<1 or p>7 then return nil,'toeic part must be 1-7' end
+    if (p<=4)~=(t.skill=='listening') then return nil,'toeic parts 1-4 are listening, 5-7 reading' end
+  end
   t.byNumber,t.total={},0
   for _,q in ipairs(t.questions) do
     local n=q.n
@@ -32,6 +38,14 @@ function M.parse(text)
   end
   return t
 end
+
+M.PARTS={'Photographs','Question–response','Conversations','Talks','Incomplete sentences','Text completion','Reading passages'}
+-- "TOEIC Part 5" / "IELTS Listening" / "IELTS Reading": prompt titles and folder names.
+function M.label(t)
+  if t.exam=='toeic' then return 'TOEIC Part '..t.part end
+  return t.skill=='listening' and 'IELTS Listening' or 'IELTS Reading'
+end
+function M.percent(right,total) return total>0 and math.floor(right*100/total+0.5) or 0 end
 
 function M.passageOf(t,n)
   for _,p in ipairs(t.passages or {}) do if n>=p.from and n<=p.to then return p end end

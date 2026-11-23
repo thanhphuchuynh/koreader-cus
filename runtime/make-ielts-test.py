@@ -4,6 +4,8 @@ Usage: python3 runtime/make-ielts-test.py <test.json> [out_dir=ielts/]
 Input is the leaf-ielts.json schema (docs/superpowers/specs/2026-11-20-ielts-reading-design.md)
 plus passages[i].paragraphs: [str]. Writes <out_dir>/<slug(title)>.epub: one chapter
 OEBPS/passage<n>.xhtml per passage, and META-INF/leaf-ielts.json (input without paragraphs).
+TOEIC part sets add exam: "toeic", part: 1-7, optional question image (Part 1 photo beside the JSON,
+stored as OEBPS/images/<name>), and may omit passages (a cover page is made).
 Exits 1 naming the problem on invalid input. Each evidence is rewritten to its exact passage text.
 """
 from html import escape
@@ -31,8 +33,24 @@ def find(ev, text):
     m = re.search(pat, text)
     return m and m.group(0)
 
+PARTS = ['Photographs', 'Question–response', 'Conversations', 'Talks',
+         'Incomplete sentences', 'Text completion', 'Reading passages']
+
+def toeic_defaults(t):
+    """TOEIC part sets: check exam/part; without passages, one cover page covering every question."""
+    if 'exam' not in t: return
+    if t['exam'] != 'toeic': raise ValueError(f"exam must be 'toeic', not {t['exam']!r}")
+    p = t.get('part')
+    if not (is_int(p) and 1 <= p <= 7): raise ValueError('toeic part must be an integer 1-7')
+    if (p <= 4) != (t.get('skill') == 'listening'): raise ValueError('toeic parts 1-4 are listening, 5-7 reading')
+    if not t.get('passages'):
+        ns = [x for q in t.get('questions') or [] for x in numbers(q)] or [1]
+        t['passages'] = [{'n': 1, 'from': min(ns), 'to': max(ns), 'title': f"Part {p} · {PARTS[p-1]}",
+                          'paragraphs': [t.get('title', ''), 'Open Questions at the top to answer.']}]
+
 def validate(t):
     """Checks everything the Kindle panel relies on; rewrites each evidence to its exact passage text."""
+    toeic_defaults(t)
     ps = t.get('passages') or []
     if not ps: raise ValueError('no passages')
     for i, p in enumerate(ps, 1):
@@ -64,6 +82,9 @@ def validate(t):
             want = q['answers'] if kind == 'multi' else [q['answer']]
             if not isinstance(want, list) or any(a not in opts for a in want):
                 raise ValueError(f'question {n}: {key} {want!r} not among options {opts!r}')
+        img = q.get('image')
+        if img is not None and not (isinstance(img, str) and re.fullmatch(r'[\w.-]+\.(jpe?g|png)', img, re.I)):
+            raise ValueError(f'question {n}: image must be a .jpg/.png file name beside the JSON')
         if kind == 'multi':
             if not isinstance(q['n'], list): raise ValueError(f'question {n}: multi n must be a list')
             if 'picks' in q and not (is_int(q['picks']) and 0 < q['picks'] <= len(ns)):
@@ -104,10 +125,16 @@ def main(argv):
     chapters = [(escape(p['title']), [escape(x) for x in p['paragraphs']]) for p in t['passages']]
     key = json.loads(json.dumps(t))
     for p in key['passages']: p.pop('paragraphs')
+    images = {}
+    for q in t['questions']:
+        if q.get('image'):
+            try: images['OEBPS/images/' + q['image']] = (Path(argv[1]).parent/q['image']).read_bytes()
+            except OSError as e:
+                print(f"error: question image {q['image']!r}: {e.strerror}", file=sys.stderr); return 1
     slug = re.sub(r'[^a-z0-9]+', '-', t['title'].lower()).strip('-')
     out = Path(argv[2] if len(argv) == 3 else 'ielts')/f'{slug}.epub'
     demo.write_epub(out, escape(t['title']), f'leaf-ielts-{slug}', chapters, stem='passage',
-                    extra={'META-INF/leaf-ielts.json': json.dumps(key, ensure_ascii=False, indent=1)})
+                    extra={'META-INF/leaf-ielts.json': json.dumps(key, ensure_ascii=False, indent=1), **images})
     print(out)
     return 0
 

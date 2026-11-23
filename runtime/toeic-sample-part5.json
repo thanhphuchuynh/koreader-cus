@@ -1,0 +1,16 @@
+{
+ "version": 1,
+ "exam": "toeic",
+ "part": 5,
+ "title": "Part 5 · Office notices",
+ "minutes": 4,
+ "groups": [{"from": 1, "to": 6, "title": "Part 5", "instructions": "Choose the word or phrase that best completes each sentence."}],
+ "questions": [
+  {"n": 1, "type": "choice", "text": "The quarterly report must be submitted ______ Friday afternoon.", "options": ["(A) by", "(B) until", "(C) since", "(D) among"], "answer": "(A) by"},
+  {"n": 2, "type": "choice", "text": "Ms. Lam asked the team to review the contract ______ before signing it.", "options": ["(A) careful", "(B) carefully", "(C) care", "(D) caring"], "answer": "(B) carefully"},
+  {"n": 3, "type": "choice", "text": "Visitors are reminded to sign in at the front desk ______ entering the building.", "options": ["(A) upon", "(B) during", "(C) beside", "(D) toward"], "answer": "(A) upon"},
+  {"n": 4, "type": "choice", "text": "The new printer is ______ faster than the one we used last year.", "options": ["(A) very", "(B) much", "(C) many", "(D) more"], "answer": "(B) much"},
+  {"n": 5, "type": "choice", "text": "All employees ______ to attend the safety training next Tuesday.", "options": ["(A) expect", "(B) expecting", "(C) are expected", "(D) have expected"], "answer": "(C) are expected"},
+  {"n": 6, "type": "choice", "text": "Because of the storm, the shipment will arrive two days ______ than planned.", "options": ["(A) late", "(B) lately", "(C) latest", "(D) later"], "answer": "(D) later"}
+ ]
+}

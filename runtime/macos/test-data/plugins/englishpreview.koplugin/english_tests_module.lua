@@ -1,4 +1,4 @@
--- SimpleUI module "Leaf · Tests": summary, the test to continue, and every test with its status.
+-- SimpleUI module "Leaf · Tests": summary, the test to continue, then folders (IELTS Listening, IELTS Reading, TOEIC by part).
 local Tests=require('english_tests')
 local M={id='leaf_tests',name='Leaf · Tests',enabled_key='leaf_tests_enabled',default_on=false}
 local function noop() end
@@ -8,37 +8,63 @@ function M.getMenuItems() return nil end
 
 local dio
 local function defaultIO() dio=dio or Tests.defaultIO() return dio end
--- ponytail: fixed caps sized for 600x800, use engine height if a screen ever needs more
-local MAX_ROWS_WITH_CARD,MAX_ROWS=3,5
+local I=require('english_ielts')
+local DIRS={'/IELTS','/IELTS/Listening','/IELTS/Reading','/TOEIC'}
+for p=1,7 do DIRS[#DIRS+1]='/TOEIC/Part '..p end
 local function clock(sec) return ('%02d:%02d'):format(math.floor(sec/60),sec%60) end
 local function status(it)
   if it.state=='new' then return 'Not started' end
   if it.state=='progress' then return ('%d/%d'):format(it.answered,it.total)..(it.remaining and ' · '..clock(it.remaining)..' left' or '') end
+  if it.percent then return ('%d/%d · %d%%'):format(it.right,it.total,it.percent) end
   return ('%d/%d · Band ≈ %s'):format(it.right,it.total,it.band)..(it.rough and ' (rough)' or '')
 end
--- Dialog with the actions a test's state allows; closes itself (and `menu`, if given) before acting.
-local function actions(it,menu)
+-- "3 tests · 1 done · band 6.5" / "2 sets · 1 done · 83%"
+local function counts(items,unit)
+  local s=Tests.summary(items)
+  local t=('%d %s%s · %d done'):format(s.count,unit,s.count==1 and '' or 's',s.finished)
+  if s.lastBand then t=t..' · band '..s.lastBand end
+  if s.best then t=t..(' · %d%%'):format(s.best) end
+  return t
+end
+local function closeAll(menus) local UIManager=require('ui/uimanager');for _,m in ipairs(menus or {}) do UIManager:close(m) end end
+-- Dialog with the actions a test's state allows; closes itself and the open lists before acting.
+local function actions(it,menus)
   local UIManager=require('ui/uimanager')
   local dialog
-  local function b(t,act) return {text=t,callback=function() UIManager:close(dialog);if menu then UIManager:close(menu) end;M.actions[act](it.path) end} end
+  local function b(t,act) return {text=t,callback=function() UIManager:close(dialog);closeAll(menus);M.actions[act](it.path) end} end
   local row
   if it.state=='done' then row={b('Review','review'),b('Retry','retry')}
   else row={b(it.state=='new' and 'Start' or 'Continue','open')} end
   dialog=require('ui/widget/buttondialog'):new{title=it.title,buttons={row}}
   UIManager:show(dialog)
 end
-
--- Every test in a KOReader Menu; an entry opens its actions dialog.
-local function showAll(items)
-  local UIManager=require('ui/uimanager')
-  local Menu=require('ui/widget/menu')
-  local menu
+local function menu(title,list)
+  local m=require('ui/widget/menu'):new{title=title,item_table=list,covers_fullscreen=true,is_borderless=true,is_popout=false}
+  require('ui/uimanager'):show(m)
+  return m
+end
+-- One folder's tests, full screen; `under` = lists already open (closed too when a test opens).
+local function showList(title,items,under)
+  local menus={unpack(under or {})}
   local list={}
   for _,it in ipairs(Tests.ordered(items)) do
-    list[#list+1]={text=it.title..' · '..status(it),callback=function() actions(it,menu) end}
+    list[#list+1]={text=it.title,mandatory=status(it),callback=function() actions(it,menus) end}
   end
-  menu=Menu:new{title='Tests',item_table=list,covers_fullscreen=true,is_borderless=true,is_popout=false}
-  UIManager:show(menu)
+  menus[#menus+1]=menu(title,list)
+end
+local function showToeic(items)
+  local menus={}
+  local list={}
+  for p=1,7 do
+    local name=('Part %d · %s'):format(p,I.PARTS[p])
+    local sets=Tests.inFolder(items,'TOEIC Part '..p)
+    list[#list+1]={text=name,mandatory=counts(sets,'set'),callback=function()
+      if #sets==0 then
+        require('ui/uimanager'):show(require('ui/widget/infomessage'):new{text=('No sets yet — put Part %d files in documents/TOEIC/Part %d'):format(p,p)})
+      else showList(name,sets,menus) end
+    end}
+  end
+  menus[1]=menu('TOEIC',list)
 end
 
 local function homeDir()
@@ -51,9 +77,7 @@ local function build(w)
   local VG=require('ui/widget/verticalgroup')
   local HG=require('ui/widget/horizontalgroup')
   local VS=require('ui/widget/verticalspan')
-  local HS=require('ui/widget/horizontalspan')
   local TB=require('ui/widget/textboxwidget')
-  local TW=require('ui/widget/textwidget')
   local Button=require('ui/widget/button')
   local Font=require('ui/font')
   local Blitbuffer=require('ffi/blitbuffer')
@@ -66,11 +90,11 @@ local function build(w)
   local function gap(n) col[#col+1]=VS:new{width=n or pad} end
   local function label(s) gap();text(s,14,'cfont',nil,Blitbuffer.COLOR_DARK_GRAY) end
   local items={}
-  for _,sub in ipairs{'/IELTS','/IELTS/Listening'} do
+  for _,sub in ipairs(DIRS) do
     for _,it in ipairs(Tests.scan(homeDir()..sub,M.io or defaultIO())) do items[#items+1]=it end
   end
   if #items==0 then
-    text('No tests yet — put test files in documents/IELTS')
+    text('No tests yet — put test files in documents/IELTS or documents/TOEIC')
     return col
   end
   local function card(it) -- the in-progress test to continue
@@ -81,16 +105,9 @@ local function build(w)
     gap(math.floor(pad/2))
     col[#col+1]=Button:new{text='Continue',height=btnH,width=math.floor((w-pad)/2),callback=function() M.actions.open(it.path) end}
   end
-  local bw=math.floor(w/4)
-  local function row(it) -- one line `title · status`, one button right; row height = button height
-    local t,fn
-    if it.state=='done' then t,fn='Review…',function() actions(it) end
-    else t,fn=it.state=='new' and 'Start' or 'Continue',function() M.actions.open(it.path) end end
+  local function folder(name,detail,fn) -- full-width row: `name · detail  ›`
     gap(math.floor(pad/2))
-    col[#col+1]=HG:new{align='center',
-      TW:new{text=it.title..' · '..status(it),face=Font:getFace('cfont',18),max_width=w-bw-pad},
-      HS:new{width=pad},
-      Button:new{text=t,height=btnH,width=bw,callback=fn}}
+    col[#col+1]=Button:new{text=name..'  ·  '..detail..'  ›',align='left',padding_h=pad,height=btnH,width=w,callback=fn}
   end
   local s=Tests.summary(items)
   label('TESTS')
@@ -104,36 +121,16 @@ local function build(w)
   col[#col+1]=srow
   local cont=Tests.continueItem(items)
   if cont then label('CONTINUE');card(cont) end
-  label('ALL TESTS')
-  local cap=cont and MAX_ROWS_WITH_CARD or MAX_ROWS
-  local shown,more=0,false
-  for _,it in ipairs(Tests.ordered(items)) do
-    if it~=cont then
-      if shown<cap then row(it);shown=shown+1 else more=true end
-    end
+  label('FOLDERS')
+  for _,name in ipairs{'IELTS Listening','IELTS Reading'} do
+    local f=Tests.inFolder(items,name)
+    folder(name,counts(f,'test'),function() showList(name,f) end)
   end
-  if more then -- right after the last row, so it stays on screen
-    gap(math.floor(pad/2))
-    col[#col+1]=Button:new{text=('All tests (%d)'):format(#items),height=btnH,width=w,callback=function() showAll(items) end}
-  end
+  local toeic={};for _,it in ipairs(items) do if it.toeic then toeic[#toeic+1]=it end end
+  folder('TOEIC',counts(toeic,'set'),function() showToeic(items) end)
   return col
 end
 
--- The engine builds at ModuleChrome.contentWidth(col_w, chrome), not at col_w.
-local function width(ctx)
-  local w=ctx and (ctx.col_w or ctx.inner_w) or require('device').screen:getWidth()
-  if ctx and ctx.pfx and ctx.col_w then
-    local ok,C=pcall(require,'features/sui_module_chrome')
-    if ok and C then
-      local ok2,v=pcall(function() return C.contentWidth(ctx.col_w,C.resolve(ctx.pfx,M.id)) end)
-      if ok2 and v then return v end
-    end
-  end
-  return w
-end
-
-function M.build(w,ctx) return build(w) end
--- SimpleUI only calls build; kept for engines that measure first.
-function M.getHeight(ctx) return build(width(ctx)):getSize().h end
+function M.build(w) return build(w) end
 
 return M

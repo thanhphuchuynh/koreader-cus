@@ -28,8 +28,8 @@ assert(a.state=='done' and a.right==2 and a.band==bd and a.rough==rough,'cache n
 recs['/t/b.epub']={mode='practice',answers={[1]='a1'},elapsed=10};mt['/t/b.epub']=200
 it=T.scan('/t',io_,0);b=by(it,'Beta')
 local s=T.summary(it);assert(s.count==2 and s.finished==1 and s.lastBand==bd)
-assert(T.continueItem(it)==b);recs['/t/b.epub']=nil;assert(T.continueItem(T.scan('/t',io_,0))==nil)
-recs['/t/b.epub']={answers={},elapsed=0};local o=T.ordered(T.scan('/t',io_,0))
+assert(T.continueItem(it)==b);recs['/t/b.epub']=nil;mt['/t/b.epub']=nil;assert(T.continueItem(T.scan('/t',io_,0))==nil)
+recs['/t/b.epub']={answers={},elapsed=0};mt['/t/b.epub']=300;local o=T.ordered(T.scan('/t',io_,0))
 assert(o[1].title=='Beta' and o[2].title=='Alpha' and T.summary({}).lastBand==nil)
 local r0=reads;T.scan('/t',io_,0);assert(reads==r0,'cache hit: no re-read')
 local st0=io_.stat;io_.stat=function(p) local x=st0(p);x.mtime=2;return x end;T.scan('/t',io_,0);assert(reads>r0,'changed mtime re-reads');io_.stat=st0
@@ -42,4 +42,17 @@ local lis=J.encode{version=1,skill='listening',title='Section 1',minutes=30,audi
 files['/t/l.epub']=lis
 local lio={list=function() return {'/t/l.epub'} end,stat=io_.stat,readJson=io_.readJson,record=io_.record,recordMtime=io_.recordMtime}
 local li=T.scan('/t',lio,0)[1];assert(li.meta=='Listening · 3 Q · 30 min','listening meta: '..li.meta)
+recs['/t/l.epub']={mode='practice',answers={[1]='a1'},elapsed=900};mt['/t/l.epub']=10
+li=T.scan('/t',lio,0)[1];assert(li.state=='progress' and li.remaining==nil,'listening: no reading countdown')
+-- a malformed test (no minutes, no passages) is skipped; the others still show
+files['/t/m.epub']=J.encode{version=1,title='Broken',questions=qs(2)}
+local mio={list=function() return {'/t/m.epub','/t/a.epub'} end,stat=io_.stat,readJson=io_.readJson,record=io_.record,recordMtime=io_.recordMtime}
+local ms=T.scan('/t',mio,0);assert(#ms>=1 and by(ms,'Alpha'),'malformed test does not hide the others')
+-- last band: the latest finish, not the latest opened sidecar
+local x={{state='done',band=7,finishedAt=500,active=500},{state='done',band=5,finishedAt=100,active=900}}
+assert(T.summary(x).lastBand==7,'last band by finish time')
+-- records are read once per sidecar mtime
+local rr=0;local cio={list=io_.list,stat=io_.stat,readJson=io_.readJson,record=function(p) rr=rr+1 return recs[p] end,recordMtime=io_.recordMtime}
+T.scan('/t',cio,0);local r1=rr;T.scan('/t',cio,0);assert(rr==r1,'record cache hit')
+mt['/t/a.epub']=mt['/t/a.epub']+1;T.scan('/t',cio,0);assert(rr==r1+1,'changed sidecar re-read')
 print('PASS: tests tab scan, status, summary, continue, ordering')

@@ -56,7 +56,9 @@ end
 function M.bottom(w,o,parent)
   if o.view=='listening' then return row(w,{{text='Close',callback=call(o.on_leave)},{text='Finish',callback=call(o.on_finish)}},nil,parent) end
   local first=o.view=='questions' and {text='← Passage',callback=call(o.on_passage)} or {text='Questions →',callback=call(o.on_questions)}
-  return row(w,{first,{text='Finish',callback=call(o.on_finish)}},nil,parent)
+  -- A finished test has nothing to finish: leave it instead (the reader's own menu sits under the bars).
+  local last=o.finished and {text='Close test',callback=call(o.on_leave)} or {text='Finish',callback=call(o.on_finish)}
+  return row(w,{first,last},nil,parent)
 end
 
 function M.confirmFinish(on_yes)
@@ -98,7 +100,7 @@ function M.overlay(o)
   UI:show(ov,'ui',region(0))
   UI:setDirty(ov,'ui',region(h-bar))
   function handle:update(n)
-    local same=n.pick==o.pick and n.tab==o.tab and n.view==o.view -- else only the timer changed
+    local same=n.pick==o.pick and n.tab==o.tab and n.view==o.view and n.finished==o.finished -- else only the timer changed
     o=n;build()
     UI:setDirty(ov,'ui',region(0))
     if not same then UI:setDirty(ov,'ui',region(h-bar)) end

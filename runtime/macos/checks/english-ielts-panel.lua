@@ -15,7 +15,7 @@ function Scroll:new(t) t=t or {};t.off={x=0,y=0};function t:getScrolledOffset() 
 local lastScroll
 package.preload['ui/uimanager']=function() return UI end
 package.preload['device']=function() return {screen={getWidth=function() return 600 end,getHeight=function() return 800 end,scaleBySize=function(_,s) return s end}} end
-for _,n in ipairs({'container/inputcontainer','container/framecontainer','container/leftcontainer','button','horizontalgroup','verticalgroup','verticalspan','textboxwidget','textwidget','buttontable'}) do
+for _,n in ipairs({'container/inputcontainer','container/framecontainer','container/leftcontainer','button','horizontalgroup','verticalgroup','verticalspan','textboxwidget','textwidget','buttontable','imagewidget'}) do
   package.preload['ui/widget/'..n]=function() return Widget end
 end
 package.preload['ui/font']=function() return {getFace=function() return {} end} end
@@ -206,4 +206,21 @@ assert(has('Band ≈') and count('▶ Hear it')==2 and count('Transcript')==3 an
 local hb=walk(shown[#shown],function(t) return t.text=='▶ Hear it' and t.callback end);hb.callback();assert(heard==lt.byNumber[1] and closedW~=shown[#shown],'Hear it plays, panel stays')
 local tb=walk(shown[#shown],function(t) return t.text=='Transcript' and t.callback end);tb.callback();assert(evidence==lt.byNumber[1] and closedMode=='full')
 button('Try again')();assert(retried,'Try again calls on_retry')
+-- TOEIC: percent instead of band; Part 1 photo above the options; worded options one per row
+local tq={version=1,exam='toeic',part=5,title='T',questions={{n=1,type='choice',text='Pick.',options={'(A) are expected','(B) expect','(C) expecting','(D) have expected'},answer='(B) expect'},
+  {n=2,type='choice',image='p.jpg',options={'A','B','C','D'},answer='A'}}}
+local tt=assert(I.parse(J.encode(tq)));local ts=S.new(tt,store());ts:setMode('study')
+local asked;local bb={}
+P.show({test=tt,session=ts,now=function() return 0 end,image=function(n) asked=n;return bb end,on_pick=function()end,on_evidence=function()end,on_passage=function()end})
+assert(asked=='p.jpg' and walk(shown[#shown],function(x) return x.image==bb and x.scale_factor==0 end),'part 1 photo drawn')
+local wordRow=walk(shown[#shown],function(x) return x[1] and x[1].text=='(A) are expected' end);assert(wordRow and #wordRow==1 and wordRow[1].align=='left','worded options: one per row')
+local letters=walk(shown[#shown],function(x) return x[1] and x[1].text=='A' end);assert(letters and #letters==4,'letters: one row')
+P.show({test=tt,session=ts,now=function() return 0 end,on_pick=function()end,on_evidence=function()end,on_passage=function()end}) -- no image loader: no crash
+ts:setAnswer(1,'(B) expect');ts:finish()
+P.show({test=tt,session=ts,results=true,now=function() return 0 end,on_pick=function()end,on_evidence=function()end,on_passage=function()end})
+assert(has('50% correct') and not has('Band ≈'),'toeic results: percent')
+assert(not button('Show in passage') and not button('Transcript'),'toeic results: nothing to show in the cover page')
+local left=0
+P.show({test=tt,session=ts,results=true,now=function() return 0 end,on_pick=function()end,on_evidence=function()end,on_passage=function()end,on_leave=function() left=left+1 end})
+button('Close test')();assert(left==1,'results: Close test leaves the book')
 print('PASS: ielts panel, selection, multi cap, blanks, passage switch, results')

@@ -100,4 +100,8 @@ o.timer='02:00';h:update(o)
 assert(has(ov,'02:00') and not has(ov,'01:00') and #dirty==nd+1 and dirty[#dirty][2]=='ui' and dirty[#dirty][3].y==0,'timer-only update refreshes the top bar only')
 nd=#dirty;h:update({pick=4,forward=o.forward});assert(#dirty==nd+2,'form change refreshes both bars')
 h:close();h:close();assert(#closed==1 and closed[1]==ov,'close once')
+-- finished test: the bottom bar leaves instead of finishing again
+local gone=0;b=B.bottom(600,{view='passage',finished=true,on_finish=function() error('finish on a finished test') end,on_leave=function() gone=gone+1 end})
+assert(has(b,'Close test') and not has(b,'Finish'),'finished: Close test, no Finish')
+walk(b,function(t) return t.text=='Close test' and t.callback end).callback();assert(gone==1,'Close test leaves')
 print('PASS')

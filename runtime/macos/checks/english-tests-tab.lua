@@ -16,7 +16,7 @@ local panels={}
 package.preload['english_ielts_panel']=function() return {show=function(o) panels[#panels+1]=o end} end
 package.preload['english_popup']=function() return {show=function() return {} end} end
 local opened={}
-package.preload['apps/reader/readerui']=function() return {showReader=function(_,p) opened[#opened+1]=p end} end
+package.preload['apps/reader/readerui']=function() return {showReader=function(_,p,_,_,_,after) opened[#opened+1]=p;opened.after=after end} end
 local function store() local s={} return {readSetting=function(_,k) return s[k] end,saveSetting=function(_,k,v) s[k]=v end,
   isTrue=function(_,k) return s[k]==true end,flush=function() s._flushed=(s._flushed or 0)+1 end,data=s} end
 local sidecars={}
@@ -112,14 +112,15 @@ local function reader(path,rec)
   local st=store();st.data.leaf_ielts=rec
   local ui={menu={registerToMainMenu=function() end},rolling={},doc_settings=st,dictionary={addToDictButtons=function() end},
     document={file=path,getDocumentFileContent=function() return KEY end}}
-  local p=setmetatable({ui=ui},{__index=Preview});p:init();p:onReaderReady();return p
+  local p=setmetatable({ui=ui},{__index=Preview});ui.englishpreview=p;p:init();p:onReaderReady();return p
 end
 local done={mode='practice',answers={},elapsed=10,finished=true}
 reader('/b/IELTS/t3.epub',done);runSoon()
 assert(#panels==0,'opening a finished test normally shows no results')
+assert(opened.after==nil,'plain open has no after-open callback')
 A.review('/b/IELTS/t3.epub')
-assert(opened[#opened]=='/b/IELTS/t3.epub','review opens the test')
-local rp=reader('/b/IELTS/t3.epub',done)
+assert(opened[#opened]=='/b/IELTS/t3.epub' and opened.after,'review opens the test with an after-open callback')
+local rp=reader('/b/IELTS/t3.epub',done);opened.after(rp.ui)
 assert(#panels==0 and #soon==2,'bars and review results deferred until the reader is on screen')
 runSoon()
 assert(#panels==1 and panels[1].results==true,'review shows results')
@@ -127,7 +128,7 @@ runSoon();assert(#panels==1,'fires once')
 reader('/b/IELTS/t3.epub',done);runSoon()
 assert(#panels==1,'review applies once')
 -- Reader closed before the deferred display: nothing shown.
-A.review('/b/IELTS/t3.epub');rp=reader('/b/IELTS/t3.epub',done);rp:onCloseDocument();runSoon()
+A.review('/b/IELTS/t3.epub');rp=reader('/b/IELTS/t3.epub',done);opened.after(rp.ui);rp:onCloseDocument();runSoon()
 assert(#panels==1,'closed reader shows nothing')
 print('PASS: Review opens the test and shows its results once')
 
@@ -148,10 +149,12 @@ assert(#screens==count+1,'screen reused, not duplicated')
 assert(tabs[2]=='open_custom_screen:'..screens[#screens].id and #tabs==3 and G_reader_settings.data.leaf_tests_tab_done,'tab added on retry')
 print('PASS: a half-way failed setup reuses its screen next time')
 
--- A Review whose book opens as a non-test (or non-EPUB) never applies to a later open.
+-- Review of a book that opens as a non-test: the callback does nothing.
 A.review('/b/IELTS/t3.epub')
 local ui={menu={registerToMainMenu=function() end},dictionary={addToDictButtons=function() end},document={file='/b/IELTS/t3.epub'}}
-local p=setmetatable({ui=ui},{__index=Preview});p:init();p:onReaderReady()
-reader('/b/IELTS/t3.epub',done);runSoon()
-assert(#panels==1,'stale review not applied')
-print('PASS: a pending Review is consumed by the next open, whatever it is')
+local p=setmetatable({ui=ui},{__index=Preview});p:init();p:onReaderReady();ui.englishpreview=p;opened.after(ui);runSoon()
+assert(#panels==1,'non-test review shows nothing')
+-- The tab is set up from the file manager only (its hint must not land on a book page).
+G_reader_settings=store();local sc=#screens;reader('/b/IELTS/t3.epub',done)
+assert(#screens==sc and not G_reader_settings.data.leaf_tests_tab_done,'reader does not set up the tab')
+print('PASS: Review callback is per open; tab setup only in the file manager')

@@ -42,4 +42,11 @@ p:pause(1300);assert(p:remaining(1300)==0 and p:elapsed(1300)==1300,'elapsed is 
 assert(not p:timeUpNoticed());p:noteTimeUp();assert(S.new(tt,p.store):timeUpNoticed())
 assert(not p:marginsAdded());p:setMarginsAdded();assert(S.new(tt,p.store):marginsAdded(),'margins flag persisted')
 p:finish();p:reset();assert(p:marginsAdded(),'reset keeps the margins flag');assert(p:mode()=='practice' and p:answered()==0 and p.rec.elapsed==0 and not p:timeUpNoticed() and not p.rec.finished and p:footer(0)=='Q 0/13 · 20:00')
+-- TOEIC part sets
+local function toe(t) t.version=1;t.questions=t.questions or {{n=1,type='choice',options={'A','B'},answer='A'}};return I.parse(J.encode(t)) end
+local t5=assert(toe{exam='toeic',part=5});assert(I.label(t5)=='TOEIC Part 5' and I.label(t)=='IELTS Reading' and I.label(lt)=='IELTS Listening')
+assert(toe{exam='toeic',part=2,skill='listening',audio={file='a.pcm',rate=16000,seconds=9}},'part 2 is listening')
+for _,bad in ipairs{{exam='toefl',part=5},{exam='toeic'},{exam='toeic',part=8},{exam='toeic',part=2.5},{exam='toeic',part=5,skill='listening',audio={file='a.pcm',rate=1,seconds=1}},{exam='toeic',part=1}} do
+  assert(toe(bad)==nil,'bad toeic accepted') end
+assert(I.percent(5,6)==83 and I.percent(0,0)==0 and I.percent(6,6)==100 and #I.PARTS==7)
 print('PASS: ielts parse, normalize, gap/choice/multi scoring, per-passage totals, band estimate, session')
